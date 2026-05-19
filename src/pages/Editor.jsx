@@ -307,7 +307,7 @@ function buildTemplates() {
 }
 
 export default function Editor({ lang }) {
-  const [mode, setMode] = useState('code') // code | snippets
+  const [mode] = useState('code')
   const [templates] = useState(buildTemplates)
   const [activeTemplate, setActiveTemplate] = useState('glassmorphism')
   const [htmlCode, setHtmlCode] = useState(DEFAULT_TEMPLATES.glassmorphism.html)
