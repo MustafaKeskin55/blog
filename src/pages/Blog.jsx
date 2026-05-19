@@ -1,0 +1,172 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import './Blog.css'
+
+const SEED_POSTS = [
+  {
+    id: '1', title: 'React ile Modern Web Uygulaması Geliştirmek',
+    titleEn: 'Building Modern Web Apps with React',
+    category: 'React', date: '2026-05-18', readTime: '5 dk',
+    excerpt: 'React ekosistemi, hooks ve modern state yönetimi ile nasıl ölçeklenebilir uygulamalar yapılır?',
+    excerptEn: 'How to build scalable apps with React hooks and modern state management.',
+    content: `## Giriş\n\nReact, günümüzün en popüler frontend kütüphanelerinden biri.\n\n## useState ve useEffect\n\nuseState ile reaktif state yönetimi, useEffect ile yan efekte dayalı işlemler.\n\n\`\`\`js\nconst [count, setCount] = useState(0)\nuseEffect(() => {\n  document.title = count\n}, [count])\n\`\`\`\n\n## Sonuç\n\nReact öğrenmek zaman alır ama ekosistem çok güçlüdür.`,
+    tags: ['React', 'JavaScript', 'Frontend']
+  },
+  {
+    id: '2', title: 'Go ile Yüksek Performanslı API Yazma',
+    titleEn: 'Building High-Performance APIs with Go',
+    category: 'Go', date: '2026-05-10', readTime: '7 dk',
+    excerpt: "Go dilinin sadeliği ve concurrency modeli ile nasıl hızlı, güvenilir REST API'lar inşa edebilirsiniz?",
+    excerptEn: "How to build fast, reliable REST APIs with Go's simplicity and concurrency model.",
+    content: `## Go Neden?\n\nGo; derlenen, statik tipli bir dil. Backend servislerde muazzam performans sunar.\n\n## Basit HTTP Sunucu\n\n\`\`\`go\npackage main\nimport "net/http"\nfunc main() {\n    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {\n        w.Write([]byte("Merhaba Go!"))\n    })\n    http.ListenAndServe(":8080", nil)\n}\n\`\`\`\n\n## Sonuç\n\nGo ile yazılan servisler hem hızlı hem okunması kolaydır.`,
+    tags: ['Go', 'Backend', 'API']
+  },
+  {
+    id: '3', title: 'CSS Grid ve Flexbox: Ne Zaman Hangisi?',
+    titleEn: 'CSS Grid vs Flexbox: When to Use Which?',
+    category: 'CSS', date: '2026-05-02', readTime: '4 dk',
+    excerpt: 'Grid ve Flexbox arasında seçim yapmak kafa karıştırıcı olabilir. Pratik kurallar paylaşıyorum.',
+    excerptEn: 'Choosing between Grid and Flexbox can be confusing. Here are practical rules.',
+    content: `## Flexbox\n\nTek boyutlu düzenlemeler için idealdir.\n\n## Grid\n\nİki boyutlu düzenlemeler için kullanın.\n\n## Pratik Kural\n\n- **Flexbox**: Nav, buton grupları\n- **Grid**: Sayfa düzeni, galeri\n\nİkisini birlikte kullanmaktan çekinmeyin!`,
+    tags: ['CSS', 'Frontend', 'Design']
+  }
+]
+
+const CATEGORIES = { tr: ['Tümü', 'React', 'Go', 'CSS', 'JavaScript', 'Python'], en: ['All', 'React', 'Go', 'CSS', 'JavaScript', 'Python'] }
+
+function initPosts() {
+  const stored = localStorage.getItem('mk_blog_posts')
+  if (stored) return JSON.parse(stored)
+  localStorage.setItem('mk_blog_posts', JSON.stringify(SEED_POSTS))
+  return SEED_POSTS
+}
+
+const T = {
+  tr: { hero: "Yazılar", heroSub: "Yazılım, tasarım ve teknoloji üzerine düşüncelerim.", search: "Yazı ara...", readMore: "Oku", min: "dk", all: "Tümü", notFound: "Yazı bulunamadı." },
+  en: { hero: "Blog", heroSub: "My thoughts on software, design and technology.", search: "Search posts...", readMore: "Read", min: "min", all: "All", notFound: "No posts found." }
+}
+
+export default function Blog({ lang = 'tr' }) {
+  const [posts, setPosts] = useState([])
+  const [activeCategory, setActiveCategory] = useState('all')
+  const [search, setSearch] = useState('')
+  const t = T[lang]
+  const cats = lang === 'tr' ? CATEGORIES.tr : CATEGORIES.en
+
+  useEffect(() => { setPosts(initPosts()) }, [])
+  useEffect(() => { setActiveCategory('all') }, [lang])
+
+  const filtered = posts.filter(p => {
+    const allCat = activeCategory === 'all' || activeCategory === 'Tümü' || activeCategory === 'All'
+    const matchCat = allCat || p.category === activeCategory
+    const title = lang === 'en' && p.titleEn ? p.titleEn : p.title
+    const excerpt = lang === 'en' && p.excerptEn ? p.excerptEn : p.excerpt
+    const matchSearch = title.toLowerCase().includes(search.toLowerCase()) || excerpt.toLowerCase().includes(search.toLowerCase())
+    return matchCat && matchSearch
+  })
+
+  return (
+    <div className="blog-page">
+      <div className="grid-bg" />
+
+      {/* HERO */}
+      <div className="blog-hero">
+        <div className="blog-hero-glow" />
+        <div className="blog-hero-inner">
+          <div className="blog-hero-eyebrow"><span className="eyebrow-dot" />mustafa.dev/blog</div>
+          <h1>{t.hero}<span className="dot-accent">.</span></h1>
+          <p>{t.heroSub}</p>
+          <div className="blog-search-wrap">
+            <i className="fas fa-search" />
+            <input type="text" placeholder={t.search} value={search} onChange={e => setSearch(e.target.value)} />
+            {search && <button className="search-clear" onClick={() => setSearch('')}><i className="fas fa-times" /></button>}
+          </div>
+          <div className="blog-stats">
+            <span><i className="fas fa-file-alt" /> {posts.length} {lang === 'tr' ? 'Yazı' : 'Posts'}</span>
+            <span><i className="fas fa-tags" /> {[...new Set(posts.map(p => p.category))].length} {lang === 'tr' ? 'Kategori' : 'Categories'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* FILTER */}
+      <div className="blog-filter-wrap">
+        <div className="blog-filter-bar">
+          {cats.map((c, i) => {
+            const val = i === 0 ? 'all' : c
+            return (
+              <button key={c} className={`cat-btn ${activeCategory === val ? 'active' : ''}`} onClick={() => setActiveCategory(val)}>
+                {c}
+                {i > 0 && <span className="cat-count">{posts.filter(p => p.category === c).length}</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* POSTS */}
+      <div className="blog-content">
+        {filtered.length === 0 ? (
+          <div className="no-posts">
+            <div className="no-posts-icon"><i className="fas fa-search" /></div>
+            <p>{t.notFound}</p>
+            <button className="btn btn-ghost" onClick={() => { setSearch(''); setActiveCategory('all') }}>
+              {lang === 'tr' ? 'Sıfırla' : 'Reset'}
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Featured post */}
+            {filtered.length > 0 && activeCategory === 'all' && !search && (
+              <Link to={`/blog/post/${filtered[0].id}`} className="post-featured">
+                <div className="post-featured-left">
+                  <div className="post-featured-top">
+                    <span className="post-cat">{filtered[0].category}</span>
+                    <span className="post-read"><i className="fas fa-clock" /> {filtered[0].readTime}</span>
+                  </div>
+                  <h2>{lang === 'en' && filtered[0].titleEn ? filtered[0].titleEn : filtered[0].title}</h2>
+                  <p>{lang === 'en' && filtered[0].excerptEn ? filtered[0].excerptEn : filtered[0].excerpt}</p>
+                  <div className="post-tags">
+                    {filtered[0].tags?.map(tag => <span key={tag} className="tag-chip">{tag}</span>)}
+                  </div>
+                </div>
+                <div className="post-featured-right">
+                  <div className="post-featured-meta">
+                    <span><i className="fas fa-calendar-alt" /> {new Date(filtered[0].date).toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    <span className="read-cta">{t.readMore} <i className="fas fa-arrow-right" /></span>
+                  </div>
+                </div>
+              </Link>
+            )}
+
+            {/* Grid */}
+            <div className="posts-grid">
+              {(activeCategory === 'all' && !search ? filtered.slice(1) : filtered).map(p => (
+                <Link to={`/blog/post/${p.id}`} key={p.id} className="post-card">
+                  <div className="post-card-inner">
+                    <div className="post-card-top">
+                      <span className="post-cat">{p.category}</span>
+                      <span className="post-read"><i className="fas fa-clock" /> {p.readTime}</span>
+                    </div>
+                    <h3>{lang === 'en' && p.titleEn ? p.titleEn : p.title}</h3>
+                    <p className="post-excerpt">{lang === 'en' && p.excerptEn ? p.excerptEn : p.excerpt}</p>
+                    <div className="post-card-footer">
+                      <span className="post-date">{new Date(p.date).toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'short' })}</span>
+                      <span className="post-arrow"><i className="fas fa-arrow-right" /></span>
+                    </div>
+                  </div>
+                  <div className="post-tags" style={{ padding: '0 1.5rem 1.2rem' }}>
+                    {p.tags?.map(tag => <span key={tag} className="tag-chip">{tag}</span>)}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <footer className="site-footer">
+        <p>Designed & Built by <b>Mustafa Keskin</b> — © 2026 · 🇹🇷</p>
+      </footer>
+    </div>
+  )
+}

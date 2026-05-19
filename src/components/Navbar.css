@@ -1,0 +1,31 @@
+.navbar {
+  position: fixed; top: 0; width: 100%; z-index: 999;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem 3rem;
+  background: rgba(8,11,17,.9);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo { font-family: var(--mono); font-size: 1.1rem; font-weight: 700; color: var(--accent); text-decoration: none; letter-spacing: 2px; }
+.nav-logo span { color: var(--accent2); }
+.navbar ul { list-style: none; display: flex; gap: 2rem; }
+.navbar ul a { font-family: var(--mono); font-size: .78rem; color: var(--muted); text-decoration: none; letter-spacing: 1px; text-transform: lowercase; transition: color .2s; display: flex; align-items: center; gap: .4rem; }
+.navbar ul a:hover, .navbar ul a.active { color: var(--accent); }
+.nav-right { display: flex; align-items: center; gap: .8rem; }
+.lang-toggle { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-family: var(--mono); font-size: .72rem; padding: .35rem .8rem; border-radius: 6px; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: .4rem; }
+.lang-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.hamburger { display: none; background: none; border: none; cursor: pointer; padding: .3rem; }
+.hamburger span { display: block; width: 22px; height: 2px; background: var(--muted); border-radius: 2px; transition: all .3s; position: relative; }
+.hamburger span::before, .hamburger span::after { content: ''; position: absolute; left: 0; width: 22px; height: 2px; background: var(--muted); border-radius: 2px; transition: all .3s; }
+.hamburger span::before { top: -7px; }
+.hamburger span::after { top: 7px; }
+.hamburger span.open { background: transparent; }
+.hamburger span.open::before { transform: translateY(7px) rotate(45deg); }
+.hamburger span.open::after { transform: translateY(-7px) rotate(-45deg); }
+@media (max-width: 700px) {
+  .navbar { padding: 1rem 1.2rem; }
+  .navbar ul { position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; background: rgba(8,11,17,.98); border-bottom: 1px solid var(--border); padding: 1rem 1.5rem; gap: .5rem; display: none; }
+  .navbar ul.open { display: flex; }
+  .navbar ul a { padding: .6rem 0; }
+  .hamburger { display: block; }
+}
