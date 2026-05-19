@@ -6,11 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postinstall": "node scripts/link-react-static.cjs",
     "lint": "eslint .",
     "preview": "vite preview"
-  },
-  "bin": {
-    "react-static": "./scripts/react-static.cjs"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
