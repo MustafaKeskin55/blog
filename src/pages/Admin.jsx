@@ -83,7 +83,7 @@ const BLANK_POST = { title: '', titleEn: '', category: 'React', excerpt: '', exc
 const BLANK_NOTE = { title: '', content: '', category: 'Genel', pinned: false }
 const BLANK_TPL = { label: '', category: 'UI', icon: 'fas fa-square', html: '', css: '', js: '' }
 const NOTE_CATS = ['Genel', 'Fikir', 'Kaynak', 'Yapılacak', 'Kod Notu']
-const TPL_CATS = ['UI', 'Layout', 'Form', 'Animation', 'Other']
+const TPL_CATS = ['Kart', 'Navigasyon', 'Hero', 'Form', 'Buton', 'Animasyon', 'Dashboard', 'Galeri', 'Diğer']
 
 function parseBulkCode(raw) {
   // <style>...</style> → css
@@ -103,6 +103,39 @@ function parseBulkCode(raw) {
   else html = html.replace(/<\/?(html|head|body|meta|title|link)[^>]*>/gi, '').trim()
 
   return { html, css, js }
+}
+
+function autoDetectTemplate(html, css, js) {
+  const all = (html + css + js).toLowerCase()
+
+  const rules = [
+    { cat: 'Navigasyon', name: 'Navbar', keywords: ['nav', 'navbar', 'menu', 'hamburger', 'sidebar'] },
+    { cat: 'Hero', name: 'Hero Bölümü', keywords: ['hero', 'landing', 'banner', 'jumbotron', 'showcase'] },
+    { cat: 'Form', name: 'Form', keywords: ['form', 'input', 'login', 'register', 'signup', 'contact', 'submit'] },
+    { cat: 'Buton', name: 'Buton Seti', keywords: ['btn', 'button', 'neon', 'glow', 'ripple'] },
+    { cat: 'Kart', name: 'Kart', keywords: ['card', 'glass', 'profile', 'pricing', 'plan', 'team', 'product'] },
+    { cat: 'Animasyon', name: 'Animasyon', keywords: ['animation', 'keyframe', 'transition', 'particle', 'canvas', 'loader', 'spinner'] },
+    { cat: 'Dashboard', name: 'Dashboard', keywords: ['dashboard', 'chart', 'stat', 'metric', 'table', 'admin', 'panel'] },
+    { cat: 'Galeri', name: 'Galeri', keywords: ['gallery', 'grid', 'masonry', 'lightbox', 'carousel', 'slider', 'portfolio'] },
+  ]
+
+  for (const rule of rules) {
+    if (rule.keywords.some(k => all.includes(k))) {
+      const label = guessLabel(html, css, rule.name)
+      return { label, category: rule.cat }
+    }
+  }
+  return { label: 'Yeni Şablon', category: 'Diğer' }
+}
+
+function guessLabel(html, css, fallback) {
+  const h1 = html.match(/<h1[^>]*>([^<]{2,40})<\/h1>/i)
+  if (h1) return h1[1].trim()
+  const title = html.match(/<title[^>]*>([^<]{2,40})<\/title>/i)
+  if (title) return title[1].trim()
+  const cls = css.match(/\.([a-z][a-z0-9-]{2,20})\s*\{/i)
+  if (cls) return cls[1].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  return fallback
 }
 
 const POSTS_KEY = 'mk_blog_posts'
@@ -405,7 +438,8 @@ export default function Admin() {
                   <button className="btn-sm" onClick={() => {
                     if (!bulkRaw.trim()) return
                     const parsed = parseBulkCode(bulkRaw)
-                    setTplForm({ ...BLANK_TPL, ...parsed })
+                    const detected = autoDetectTemplate(parsed.html, parsed.css, parsed.js)
+                    setTplForm({ ...BLANK_TPL, ...parsed, label: detected.label, category: detected.category })
                     setEditTplId(null)
                     setBulkOpen(false)
                     setBulkRaw('')

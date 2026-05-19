@@ -293,10 +293,8 @@ h1{font-size:2.5rem;font-weight:900;letter-spacing:-1px}
   }
 }
 
-const SNIPPETS_KEY = 'mk_snippets'
 const TEMPLATES_KEY = 'mk_editor_templates'
 
-function getSnippets() { return JSON.parse(localStorage.getItem(SNIPPETS_KEY) || '[]') }
 function getCustomTemplates() { return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '[]') }
 
 function buildTemplates() {
@@ -307,7 +305,6 @@ function buildTemplates() {
 }
 
 export default function Editor({ lang }) {
-  const [mode] = useState('code')
   const [templates] = useState(buildTemplates)
   const [activeTemplate, setActiveTemplate] = useState('glassmorphism')
   const [htmlCode, setHtmlCode] = useState(DEFAULT_TEMPLATES.glassmorphism.html)
@@ -316,7 +313,6 @@ export default function Editor({ lang }) {
   const [activeTab, setActiveTab] = useState('html')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [splitV, setSplitV] = useState(false)
-  const [snippets] = useState(getSnippets)
   const [copied, setCopied] = useState(false)
   const iframeRef = useRef()
 
@@ -324,19 +320,12 @@ export default function Editor({ lang }) {
     const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>${cssCode}</style></head><body>${htmlCode}<script>${jsCode}<\/script></body></html>`
     iframeRef.current.srcdoc = doc
   }
-  useEffect(() => { if (mode === 'code') run() }, [htmlCode, cssCode, jsCode])
+  useEffect(() => { run() }, [htmlCode, cssCode, jsCode])
 
   const loadTemplate = (key) => {
     const t = templates[key]
     setActiveTemplate(key)
     setHtmlCode(t.html); setCssCode(t.css); setJsCode(t.js)
-  }
-
-  const loadSnippet = (s) => {
-    if (s.lang === 'html') setHtmlCode(s.code)
-    else if (s.lang === 'css') setCssCode(s.code)
-    else setJsCode(s.code)
-    setActiveTab(s.lang); setMode('code')
   }
 
   const copy = () => {
@@ -349,108 +338,71 @@ export default function Editor({ lang }) {
   const categories = [...new Set(Object.values(templates).map(t => t.category))]
 
   const T = lang === 'tr'
-    ? { code: 'Kod Editörü', snippets: 'Snippetler', copyBtn: copied ? 'Kopyalandı!' : 'Kopyala', run: 'Çalıştır', preview: 'Önizleme', noSnip: 'Henüz snippet yok.' }
-    : { code: 'Code Editor', snippets: 'Snippets', copyBtn: copied ? 'Copied!' : 'Copy', run: 'Run', preview: 'Preview', noSnip: 'No snippets yet.' }
+    ? { code: 'Kod Editörü', copyBtn: copied ? 'Kopyalandı!' : 'Kopyala', run: 'Çalıştır', preview: 'Önizleme' }
+    : { code: 'Code Editor', copyBtn: copied ? 'Copied!' : 'Copy', run: 'Run', preview: 'Preview' }
 
   return (
     <div className={`editor-page ${isFullscreen ? 'fullscreen' : ''}`}>
       {/* TOP BAR */}
       <div className="editor-topbar">
         <div className="editor-tabs-main">
-          <button className={`main-tab ${mode === 'code' ? 'active' : ''}`} onClick={() => setMode('code')}>
+          <button className="main-tab active">
             <i className="fas fa-code"/> {T.code}
-          </button>
-          <button className={`main-tab ${mode === 'snippets' ? 'active' : ''}`} onClick={() => setMode('snippets')}>
-            <i className="fas fa-bookmark"/> {T.snippets} {snippets.length > 0 && <span className="badge-count">{snippets.length}</span>}
           </button>
         </div>
         <div className="editor-actions">
-          {mode === 'code' && <>
-            <button className="action-btn" onClick={copy} title={T.copyBtn}><i className={`fas fa-${copied ? 'check' : 'copy'}`}/></button>
-            <button className="action-btn" onClick={() => setSplitV(v => !v)} title="Layout"><i className="fas fa-columns"/></button>
-            <button className="action-btn" onClick={() => setIsFullscreen(f => !f)} title="Fullscreen"><i className={`fas fa-${isFullscreen ? 'compress' : 'expand'}`}/></button>
-          </>}
+          <button className="action-btn" onClick={copy} title={T.copyBtn}><i className={`fas fa-${copied ? 'check' : 'copy'}`}/></button>
+          <button className="action-btn" onClick={() => setSplitV(v => !v)} title="Layout"><i className="fas fa-columns"/></button>
+          <button className="action-btn" onClick={() => setIsFullscreen(f => !f)} title="Fullscreen"><i className={`fas fa-${isFullscreen ? 'compress' : 'expand'}`}/></button>
         </div>
       </div>
 
       {/* CODE MODE */}
-      {mode === 'code' && (
-        <div className="editor-body">
-          <div className={`editor-left ${splitV ? 'split-v' : ''}`}>
-            {/* Template picker */}
-            <div className="template-sidebar">
-              <div className="tpl-section-label">Templates</div>
-              {categories.map(cat => (
-                <div key={cat}>
-                  <div className="tpl-cat-label">{cat}</div>
-                  {Object.entries(templates).filter(([,t]) => t.category === cat).map(([key, t]) => (
-                    <button key={key} className={`tpl-item ${activeTemplate === key ? 'active' : ''}`} onClick={() => loadTemplate(key)}>
-                      <i className={t.icon}/> {t.label}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-
-            {/* Code panel */}
-            <div className="editor-panel">
-              <div className="tab-bar">
-                {['html', 'css', 'js'].map(tab => (
-                  <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-                    <i className={tab === 'html' ? 'fab fa-html5' : tab === 'css' ? 'fab fa-css3-alt' : 'fab fa-js'}/>
-                    {tab.toUpperCase()}
-                    <span className="line-count">{(tab === 'html' ? htmlCode : tab === 'css' ? cssCode : jsCode).split('\n').length}L</span>
+      <div className="editor-body">
+        <div className={`editor-left ${splitV ? 'split-v' : ''}`}>
+          {/* Template picker */}
+          <div className="template-sidebar">
+            <div className="tpl-section-label">Templates</div>
+            {categories.map(cat => (
+              <div key={cat}>
+                <div className="tpl-cat-label">{cat}</div>
+                {Object.entries(templates).filter(([,t]) => t.category === cat).map(([key, t]) => (
+                  <button key={key} className={`tpl-item ${activeTemplate === key ? 'active' : ''}`} onClick={() => loadTemplate(key)}>
+                    <i className={t.icon}/> {t.label}
                   </button>
                 ))}
               </div>
-              <div className="cm-wrap">
-                {activeTab === 'html' && <CodeMirror value={htmlCode} onChange={setHtmlCode} extensions={[langMap.html]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true, foldGutter: true }}/>}
-                {activeTab === 'css' && <CodeMirror value={cssCode} onChange={setCssCode} extensions={[langMap.css]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true }}/>}
-                {activeTab === 'js' && <CodeMirror value={jsCode} onChange={setJsCode} extensions={[langMap.js]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true }}/>}
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* RIGHT: preview */}
-          <div className="editor-right">
-            <div className="preview-bar">
-              <span className="preview-label"><i className="fas fa-circle" style={{color:'#28c840',fontSize:'.55rem'}}/> <i className="fas fa-circle" style={{color:'#febc2e',fontSize:'.55rem'}}/> <i className="fas fa-circle" style={{color:'#ff5f57',fontSize:'.55rem'}}/> &nbsp; {T.preview}</span>
-              <button className="run-btn" onClick={run}><i className="fas fa-play"/> {T.run}</button>
-            </div>
-            <iframe ref={iframeRef} className="preview-frame" title="preview" sandbox="allow-scripts"/>
-          </div>
-        </div>
-      )}
-
-      {/* SNIPPETS MODE — read-only, load into editor */}
-      {mode === 'snippets' && (
-        <div className="panel-page">
-          <div className="panel-header">
-            <h2><i className="fas fa-bookmark"/> {T.snippets}</h2>
-          </div>
-          {snippets.length === 0 ? (
-            <div className="empty-panel"><i className="fas fa-bookmark"/><p>{T.noSnip}</p></div>
-          ) : (
-            <div className="snippets-grid">
-              {snippets.map(s => (
-                <div key={s.id} className="snippet-card">
-                  <div className="snip-top">
-                    <span className="snip-lang">{s.lang.toUpperCase()}</span>
-                    <span className="snip-date">{s.date}</span>
-                  </div>
-                  <h3>{s.title}</h3>
-                  {s.note && <p className="snip-note">{s.note}</p>}
-                  <pre className="snip-preview">{s.code.slice(0, 120)}{s.code.length > 120 ? '...' : ''}</pre>
-                  <div className="snip-actions">
-                    <button className="btn-sm" onClick={() => loadSnippet(s)}><i className="fas fa-code"/> Load</button>
-                    <button className="btn-sm btn-sm--ghost" onClick={() => navigator.clipboard.writeText(s.code)}><i className="fas fa-copy"/></button>
-                  </div>
-                </div>
+          {/* Code panel */}
+          <div className="editor-panel">
+            <div className="tab-bar">
+              {['html', 'css', 'js'].map(tab => (
+                <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
+                  <i className={tab === 'html' ? 'fab fa-html5' : tab === 'css' ? 'fab fa-css3-alt' : 'fab fa-js'}/>
+                  {tab.toUpperCase()}
+                  <span className="line-count">{(tab === 'html' ? htmlCode : tab === 'css' ? cssCode : jsCode).split('\n').length}L</span>
+                </button>
               ))}
             </div>
-          )}
+            <div className="cm-wrap">
+              {activeTab === 'html' && <CodeMirror value={htmlCode} onChange={setHtmlCode} extensions={[langMap.html]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true, foldGutter: true }}/>}
+              {activeTab === 'css' && <CodeMirror value={cssCode} onChange={setCssCode} extensions={[langMap.css]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true }}/>}
+              {activeTab === 'js' && <CodeMirror value={jsCode} onChange={setJsCode} extensions={[langMap.js]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true }}/>}
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* RIGHT: preview */}
+        <div className="editor-right">
+          <div className="preview-bar">
+            <span className="preview-label"><i className="fas fa-circle" style={{color:'#28c840',fontSize:'.55rem'}}/> <i className="fas fa-circle" style={{color:'#febc2e',fontSize:'.55rem'}}/> <i className="fas fa-circle" style={{color:'#ff5f57',fontSize:'.55rem'}}/> &nbsp; {T.preview}</span>
+            <button className="run-btn" onClick={run}><i className="fas fa-play"/> {T.run}</button>
+          </div>
+          <iframe ref={iframeRef} className="preview-frame" title="preview" sandbox="allow-scripts"/>
+        </div>
+      </div>
     </div>
   )
 }
