@@ -2,6 +2,44 @@ import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import './Post.css'
 
+const SITE_URL = 'https://mustafakeskin.pages.dev'
+
+function usePostSEO(post) {
+  useEffect(() => {
+    if (!post) return
+    document.title = `${post.title} | Mustafa Keskin`
+    const set = (sel, attr, val) => { const el = document.querySelector(sel); if (el) el.setAttribute(attr, val) }
+    set('meta[name="description"]', 'content', post.excerpt || post.title)
+    set('meta[property="og:title"]', 'content', `${post.title} | Mustafa Keskin`)
+    set('meta[property="og:description"]', 'content', post.excerpt || post.title)
+    set('meta[property="og:type"]', 'content', 'article')
+    set('meta[property="og:url"]', 'content', `${SITE_URL}/blog/post/${post.id}`)
+    set('link[rel="canonical"]', 'href', `${SITE_URL}/blog/post/${post.id}`)
+
+    // JSON-LD BlogPosting
+    const existing = document.getElementById('ld-post')
+    if (existing) existing.remove()
+    const script = document.createElement('script')
+    script.id = 'ld-post'
+    script.type = 'application/ld+json'
+    script.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": post.title,
+      "description": post.excerpt,
+      "datePublished": post.date,
+      "author": { "@type": "Person", "name": "Mustafa Keskin", "url": SITE_URL },
+      "publisher": { "@type": "Person", "name": "Mustafa Keskin" },
+      "url": `${SITE_URL}/blog/post/${post.id}`,
+      "keywords": post.tags?.join(', '),
+      "articleSection": post.category,
+      "inLanguage": "tr"
+    })
+    document.head.appendChild(script)
+    return () => { const s = document.getElementById('ld-post'); if (s) s.remove() }
+  }, [post])
+}
+
 function parseContent(text) {
   return text
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
@@ -27,6 +65,8 @@ export default function Post() {
     const found = stored.find(p => p.id === id)
     if (found) setPost(found)
   }, [id])
+
+  usePostSEO(post)
 
   useEffect(() => {
     const onScroll = () => {

@@ -82,6 +82,16 @@ function ParticlesCanvas() {
 
 export default function Home() {
   useReveal()
+  useEffect(() => {
+    document.title = 'Mustafa Keskin | Full Stack Developer'
+    const set = (sel, attr, val) => { const el = document.querySelector(sel); if (el) el.setAttribute(attr, val) }
+    set('meta[name="description"]', 'content', 'Mustafa Keskin — Türkiye\'den Full Stack yazılım geliştirici. React, Go, JavaScript, Python, PHP ve C# ile modern web uygulamaları geliştiriyor.')
+    set('meta[property="og:title"]', 'content', 'Mustafa Keskin | Full Stack Developer')
+    set('meta[property="og:description"]', 'content', 'React, Go, JavaScript ve daha fazlasıyla modern web uygulamaları geliştiren Türk yazılım geliştirici.')
+    set('meta[property="og:type"]', 'content', 'website')
+    set('meta[property="og:url"]', 'content', 'https://mustafakeskin.pages.dev/')
+    set('link[rel="canonical"]', 'href', 'https://mustafakeskin.pages.dev/')
+  }, [])
   return (
     <>
       <ParticlesCanvas />

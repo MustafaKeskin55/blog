@@ -2,6 +2,22 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import './Blog.css'
 
+function useSEO({ title, description, url }) {
+  useEffect(() => {
+    document.title = title
+    let desc = document.querySelector('meta[name="description"]')
+    if (desc) desc.setAttribute('content', description)
+    let ogTitle = document.querySelector('meta[property="og:title"]')
+    if (ogTitle) ogTitle.setAttribute('content', title)
+    let ogDesc = document.querySelector('meta[property="og:description"]')
+    if (ogDesc) ogDesc.setAttribute('content', description)
+    let ogUrl = document.querySelector('meta[property="og:url"]')
+    if (ogUrl) ogUrl.setAttribute('content', url)
+    let canonical = document.querySelector('link[rel="canonical"]')
+    if (canonical) canonical.setAttribute('href', url)
+  }, [title, description, url])
+}
+
 const SEED_POSTS = [
   {
     id: '1', title: 'React ile Modern Web Uygulaması Geliştirmek',
@@ -32,7 +48,6 @@ const SEED_POSTS = [
   }
 ]
 
-const CATEGORIES = { tr: ['Tümü', 'React', 'Go', 'CSS', 'JavaScript', 'Python'], en: ['All', 'React', 'Go', 'CSS', 'JavaScript', 'Python'] }
 
 function initPosts() {
   const stored = localStorage.getItem('mk_blog_posts')
@@ -51,10 +66,22 @@ export default function Blog({ lang = 'tr' }) {
   const [activeCategory, setActiveCategory] = useState('all')
   const [search, setSearch] = useState('')
   const t = T[lang]
-  const cats = lang === 'tr' ? CATEGORIES.tr : CATEGORIES.en
+
+  useSEO({
+    title: lang === 'en' ? 'Blog | Mustafa Keskin — Full Stack Developer' : 'Blog | Mustafa Keskin — Yazılım & Teknoloji',
+    description: lang === 'en'
+      ? 'Mustafa Keskin\'s blog about React, Go, JavaScript, CSS and modern web development.'
+      : 'Mustafa Keskin\'in React, Go, JavaScript, CSS ve modern web geliştirme üzerine yazıları.',
+    url: 'https://mustafakeskin.pages.dev/blog'
+  })
 
   useEffect(() => { setPosts(initPosts()) }, [])
   useEffect(() => { setActiveCategory('all') }, [lang])
+
+  // Kategoriler postlardan dinamik üretiliyor
+  const dynamicCats = [...new Set(posts.map(p => p.category))].sort()
+  const allLabel = lang === 'tr' ? 'Tümü' : 'All'
+  const cats = [allLabel, ...dynamicCats]
 
   const filtered = posts.filter(p => {
     const allCat = activeCategory === 'all' || activeCategory === 'Tümü' || activeCategory === 'All'
