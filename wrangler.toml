@@ -1,8 +1,10 @@
 name = "mustafakeskinblog"
+main = "worker/index.js"
 compatibility_date = "2024-01-01"
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 [[d1_databases]]

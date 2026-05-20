@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { api } from '../lib/api'
 import CodeMirror from '@uiw/react-codemirror'
 import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
@@ -293,19 +294,14 @@ h1{font-size:2.5rem;font-weight:900;letter-spacing:-1px}
   }
 }
 
-const TEMPLATES_KEY = 'mk_editor_templates'
-
-function getCustomTemplates() { return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '[]') }
-
-function buildTemplates() {
-  const custom = getCustomTemplates()
+function buildTemplates(custom = []) {
   const base = { ...DEFAULT_TEMPLATES }
   custom.forEach(t => { base[`custom_${t.id}`] = t })
   return base
 }
 
 export default function Editor({ lang }) {
-  const [templates] = useState(buildTemplates)
+  const [templates, setTemplates] = useState(() => buildTemplates())
   const [activeTemplate, setActiveTemplate] = useState('glassmorphism')
   const [htmlCode, setHtmlCode] = useState(DEFAULT_TEMPLATES.glassmorphism.html)
   const [cssCode, setCssCode] = useState(DEFAULT_TEMPLATES.glassmorphism.css)
@@ -317,6 +313,12 @@ export default function Editor({ lang }) {
   const [mobileView, setMobileView] = useState('editor') // 'editor' | 'preview' | 'templates'
   const [tplDrawer, setTplDrawer] = useState(false)
   const iframeRef = useRef()
+
+  useEffect(() => {
+    api.getTemplates()
+      .then(custom => setTemplates(buildTemplates(custom)))
+      .catch(() => {})
+  }, [])
 
   const run = () => {
     const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>${cssCode}</style></head><body>${htmlCode}<script>${jsCode}<\/script></body></html>`

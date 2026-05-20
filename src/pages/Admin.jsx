@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { api, setToken, clearToken, isLoggedIn } from '../lib/api'
 import './Admin.css'
 
-const GA_KEY = 'mk_ga_id'
-
 function AnalyticsTab() {
-  const [gaId, setGaId] = useState(() => localStorage.getItem(GA_KEY) || '')
+  const [gaId, setGaId] = useState('')
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const save = (e) => {
+  useEffect(() => {
+    api.getSettings().then(s => setGaId(s.gaMeasurementId || '')).catch(() => {})
+  }, [])
+
+  const save = async (e) => {
     e.preventDefault()
-    localStorage.setItem(GA_KEY, gaId.trim())
-    setSaved(true); setTimeout(() => setSaved(false), 2000)
+    try {
+      await api.updateSettings({ gaMeasurementId: gaId.trim() })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch {
+      setSaved(false)
+    }
   }
 
   const id = gaId.trim() || 'G-XXXXXXXXXX'
@@ -77,7 +85,6 @@ function AnalyticsTab() {
   )
 }
 
-const PASS = 'admin123'
 const BLANK_POST = { title: '', titleEn: '', category: '', excerpt: '', excerptEn: '', content: '', tags: '', readTime: '5 dk' }
 const BLANK_NOTE = { title: '', content: '', category: '', pinned: false }
 const BLANK_TPL = { label: '', category: '', icon: 'fas fa-square', html: '', css: '', js: '' }
@@ -135,16 +142,6 @@ function guessLabel(html, css, fallback) {
   return fallback
 }
 
-const POSTS_KEY = 'mk_blog_posts'
-const NOTES_KEY = 'mk_editor_notes'
-const TEMPLATES_KEY = 'mk_editor_templates'
-
-function getPosts() { return JSON.parse(localStorage.getItem(POSTS_KEY) || '[]') }
-function savePosts(p) { localStorage.setItem(POSTS_KEY, JSON.stringify(p)) }
-function getNotes() { return JSON.parse(localStorage.getItem(NOTES_KEY) || '[]') }
-function saveNotes(n) { localStorage.setItem(NOTES_KEY, JSON.stringify(n)) }
-function getTemplates() { return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '[]') }
-function saveTemplates(t) { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t)) }
 
 export default function Admin() {
   const [auth, setAuth] = useState(false)
@@ -170,72 +167,142 @@ export default function Admin() {
 
   const navigate = useNavigate()
 
+  const loadAll = async () => {
+    try {
+      let [p, n, t] = await Promise.all([
+        api.adminGetPosts(),
+        api.getNotes(),
+        api.adminGetTemplates(),
+      ])
+      if (p.length === 0) {
+        await api.seed()
+        p = await api.adminGetPosts()
+      }
+      setPosts(p)
+      setNotes(n)
+      setTemplates(t)
+    } catch (e) {
+      if (e.message === 'Unauthorized') {
+        clearToken()
+        setAuth(false)
+      }
+    }
+  }
+
   useEffect(() => {
-    if (sessionStorage.getItem('mk_admin') === '1') {
-      setAuth(true); setPosts(getPosts()); setNotes(getNotes()); setTemplates(getTemplates())
+    if (isLoggedIn()) {
+      setAuth(true)
+      loadAll()
     }
   }, [])
 
-  const login = (e) => {
+  const login = async (e) => {
     e.preventDefault()
-    if (pass === PASS) {
-      sessionStorage.setItem('mk_admin', '1')
-      setAuth(true); setPosts(getPosts()); setNotes(getNotes()); setTemplates(getTemplates())
-    } else { setPassErr('Yanlış şifre.'); setPass('') }
+    try {
+      const { token } = await api.login(pass)
+      setToken(token)
+      setAuth(true)
+      setPassErr('')
+      await loadAll()
+    } catch {
+      setPassErr('Yanlış şifre.')
+      setPass('')
+    }
   }
-  const logout = () => { sessionStorage.removeItem('mk_admin'); setAuth(false) }
+  const logout = async () => {
+    try { await api.logout() } catch { /* ignore */ }
+    clearToken()
+    setAuth(false)
+  }
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
   const nav = (v) => { setView(v); setSidebarOpen(false) }
 
   // POSTS
   const startNew = () => { setForm(BLANK_POST); setEditId(null); nav('new') }
   const startEdit = (p) => { setForm({ ...p, tags: p.tags?.join(', ') || '', titleEn: p.titleEn || '', excerptEn: p.excerptEn || '' }); setEditId(p.id); setView('edit') }
-  const deletePost = (id) => {
+  const deletePost = async (id) => {
     if (!window.confirm('Bu yazıyı silmek istediğinden emin misin?')) return
-    const u = posts.filter(p => p.id !== id); savePosts(u); setPosts(u); showToast('Yazı silindi.')
+    try {
+      await api.deletePost(id)
+      setPosts(u => u.filter(p => p.id !== id))
+      showToast('Yazı silindi.')
+    } catch (e) { showToast(e.message) }
   }
-  const submitPost = (e) => {
+  const submitPost = async (e) => {
     e.preventDefault()
     const tags = form.tags.split(',').map(t => t.trim()).filter(Boolean)
-    const today = new Date().toISOString().split('T')[0]
-    if (view === 'new') {
-      const post = { ...form, id: Date.now().toString(), date: today, tags }
-      const u = [post, ...posts]; savePosts(u); setPosts(u); showToast('Yazı yayınlandı!')
-    } else {
-      const u = posts.map(p => p.id === editId ? { ...form, id: editId, date: p.date, tags } : p)
-      savePosts(u); setPosts(u); showToast('Yazı güncellendi.')
-    }
-    setView('list')
+    const payload = { ...form, tags }
+    try {
+      if (view === 'new') {
+        const post = await api.createPost(payload)
+        setPosts(u => [post, ...u])
+        showToast('Yazı yayınlandı!')
+      } else {
+        const existing = posts.find(p => p.id === editId)
+        const post = await api.updatePost(editId, { ...payload, date: existing?.date })
+        setPosts(u => u.map(p => p.id === editId ? post : p))
+        showToast('Yazı güncellendi.')
+      }
+      setView('list')
+    } catch (e) { showToast(e.message) }
   }
 
   // NOTES
-  const submitNote = (e) => {
+  const submitNote = async (e) => {
     e.preventDefault()
-    const today = new Date().toLocaleDateString('tr-TR')
-    const u = editNoteId
-      ? notes.map(n => n.id === editNoteId ? { ...noteForm, id: editNoteId } : n)
-      : [{ ...noteForm, id: Date.now(), date: today }, ...notes]
-    saveNotes(u); setNotes(u); setNoteForm(null); setEditNoteId(null); showToast('Not kaydedildi.')
+    try {
+      if (editNoteId) {
+        const note = await api.updateNote(editNoteId, noteForm)
+        setNotes(u => u.map(n => n.id === editNoteId ? note : n))
+      } else {
+        const note = await api.createNote(noteForm)
+        setNotes(u => [note, ...u])
+      }
+      setNoteForm(null)
+      setEditNoteId(null)
+      showToast('Not kaydedildi.')
+    } catch (e) { showToast(e.message) }
   }
-  const deleteNote = (id) => {
+  const deleteNote = async (id) => {
     if (!window.confirm('Notu sil?')) return
-    const u = notes.filter(n => n.id !== id); saveNotes(u); setNotes(u); showToast('Not silindi.')
+    try {
+      await api.deleteNote(id)
+      setNotes(u => u.filter(n => n.id !== id))
+      showToast('Not silindi.')
+    } catch (e) { showToast(e.message) }
   }
-  const togglePin = (id) => {
-    const u = notes.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n); saveNotes(u); setNotes(u)
+  const togglePin = async (id) => {
+    const note = notes.find(n => n.id === id)
+    if (!note) return
+    try {
+      const updated = await api.updateNote(id, { ...note, pinned: !note.pinned })
+      setNotes(u => u.map(n => n.id === id ? updated : n))
+    } catch (e) { showToast(e.message) }
   }
 
   // TEMPLATES
-  const submitTemplate = (e) => {
+  const submitTemplate = async (e) => {
     e.preventDefault()
-    const u = editTplId
-      ? templates.map(t => t.id === editTplId ? { ...tplForm, id: editTplId } : t)
-      : [{ ...tplForm, id: Date.now() }, ...templates]
-    saveTemplates(u); setTemplates(u); setTplForm(null); setEditTplId(null); showToast('Şablon kaydedildi.')
+    try {
+      if (editTplId) {
+        const tpl = await api.updateTemplate(editTplId, tplForm)
+        setTemplates(u => u.map(t => t.id === editTplId ? tpl : t))
+      } else {
+        const tpl = await api.createTemplate(tplForm)
+        setTemplates(u => [tpl, ...u])
+      }
+      setTplForm(null)
+      setEditTplId(null)
+      showToast('Şablon kaydedildi.')
+    } catch (e) { showToast(e.message) }
   }
-  const deleteTemplate = (id) => {
+  const deleteTemplate = async (id) => {
     if (!window.confirm('Şablonu sil?')) return
-    const u = templates.filter(t => t.id !== id); saveTemplates(u); setTemplates(u); showToast('Şablon silindi.')
+    try {
+      await api.deleteTemplate(id)
+      setTemplates(u => u.filter(t => t.id !== id))
+      showToast('Şablon silindi.')
+    } catch (e) { showToast(e.message) }
   }
 
   // LOGIN
@@ -315,7 +382,7 @@ export default function Admin() {
         {view === 'list' && (
           <>
             <div className="admin-header">
-              <div><h2>Yazılar</h2><p className="admin-sub">{posts.length} yazı · LocalStorage</p></div>
+              <div><h2>Yazılar</h2><p className="admin-sub">{posts.length} yazı · Cloudflare D1</p></div>
               <button className="btn-sm" onClick={startNew}><i className="fas fa-plus" /> Yeni Yazı</button>
             </div>
             <div className="posts-table">

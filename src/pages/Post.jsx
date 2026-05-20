@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
+import { api } from '../lib/api'
 import './Post.css'
 
 const SITE_URL = 'https://mustafakeskin.pages.dev'
@@ -54,16 +55,23 @@ function parseContent(text) {
 
 export default function Post() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const [post, setPost] = useState(null)
   const [allPosts, setAllPosts] = useState([])
+  const [loading, setLoading] = useState(true)
   const [scroll, setScroll] = useState(0)
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem('mk_blog_posts') || '[]')
-    setAllPosts(stored)
-    const found = stored.find(p => p.id === id)
-    if (found) setPost(found)
+    setLoading(true)
+    Promise.all([api.getPost(id), api.getPosts()])
+      .then(([found, list]) => {
+        setPost(found)
+        setAllPosts(list)
+      })
+      .catch(() => {
+        setPost(null)
+        setAllPosts([])
+      })
+      .finally(() => setLoading(false))
   }, [id])
 
   usePostSEO(post)
@@ -77,6 +85,13 @@ export default function Post() {
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  if (loading) return (
+    <div className="post-not-found">
+      <i className="fas fa-spinner fa-spin" />
+      <p>Yükleniyor...</p>
+    </div>
+  )
 
   if (!post) return (
     <div className="post-not-found">

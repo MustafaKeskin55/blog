@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { api } from '../lib/api'
 import './Blog.css'
 
 function useSEO({ title, description, url }) {
@@ -18,43 +19,6 @@ function useSEO({ title, description, url }) {
   }, [title, description, url])
 }
 
-const SEED_POSTS = [
-  {
-    id: '1', title: 'React ile Modern Web Uygulaması Geliştirmek',
-    titleEn: 'Building Modern Web Apps with React',
-    category: 'React', date: '2026-05-18', readTime: '5 dk',
-    excerpt: 'React ekosistemi, hooks ve modern state yönetimi ile nasıl ölçeklenebilir uygulamalar yapılır?',
-    excerptEn: 'How to build scalable apps with React hooks and modern state management.',
-    content: `## Giriş\n\nReact, günümüzün en popüler frontend kütüphanelerinden biri.\n\n## useState ve useEffect\n\nuseState ile reaktif state yönetimi, useEffect ile yan efekte dayalı işlemler.\n\n\`\`\`js\nconst [count, setCount] = useState(0)\nuseEffect(() => {\n  document.title = count\n}, [count])\n\`\`\`\n\n## Sonuç\n\nReact öğrenmek zaman alır ama ekosistem çok güçlüdür.`,
-    tags: ['React', 'JavaScript', 'Frontend']
-  },
-  {
-    id: '2', title: 'Go ile Yüksek Performanslı API Yazma',
-    titleEn: 'Building High-Performance APIs with Go',
-    category: 'Go', date: '2026-05-10', readTime: '7 dk',
-    excerpt: "Go dilinin sadeliği ve concurrency modeli ile nasıl hızlı, güvenilir REST API'lar inşa edebilirsiniz?",
-    excerptEn: "How to build fast, reliable REST APIs with Go's simplicity and concurrency model.",
-    content: `## Go Neden?\n\nGo; derlenen, statik tipli bir dil. Backend servislerde muazzam performans sunar.\n\n## Basit HTTP Sunucu\n\n\`\`\`go\npackage main\nimport "net/http"\nfunc main() {\n    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {\n        w.Write([]byte("Merhaba Go!"))\n    })\n    http.ListenAndServe(":8080", nil)\n}\n\`\`\`\n\n## Sonuç\n\nGo ile yazılan servisler hem hızlı hem okunması kolaydır.`,
-    tags: ['Go', 'Backend', 'API']
-  },
-  {
-    id: '3', title: 'CSS Grid ve Flexbox: Ne Zaman Hangisi?',
-    titleEn: 'CSS Grid vs Flexbox: When to Use Which?',
-    category: 'CSS', date: '2026-05-02', readTime: '4 dk',
-    excerpt: 'Grid ve Flexbox arasında seçim yapmak kafa karıştırıcı olabilir. Pratik kurallar paylaşıyorum.',
-    excerptEn: 'Choosing between Grid and Flexbox can be confusing. Here are practical rules.',
-    content: `## Flexbox\n\nTek boyutlu düzenlemeler için idealdir.\n\n## Grid\n\nİki boyutlu düzenlemeler için kullanın.\n\n## Pratik Kural\n\n- **Flexbox**: Nav, buton grupları\n- **Grid**: Sayfa düzeni, galeri\n\nİkisini birlikte kullanmaktan çekinmeyin!`,
-    tags: ['CSS', 'Frontend', 'Design']
-  }
-]
-
-
-function initPosts() {
-  const stored = localStorage.getItem('mk_blog_posts')
-  if (stored) return JSON.parse(stored)
-  localStorage.setItem('mk_blog_posts', JSON.stringify(SEED_POSTS))
-  return SEED_POSTS
-}
 
 const T = {
   tr: { hero: "Yazılar", heroSub: "Yazılım, tasarım ve teknoloji üzerine düşüncelerim.", search: "Yazı ara...", readMore: "Oku", min: "dk", all: "Tümü", notFound: "Yazı bulunamadı." },
@@ -68,8 +32,7 @@ export default function Blog({ lang = 'tr' }) {
   const t = T[lang]
 
   useEffect(() => {
-    fetch('/api/posts')
-      .then(r => r.json())
+    api.getPosts()
       .then(setPosts)
       .catch(() => setPosts([]))
   }, [])
