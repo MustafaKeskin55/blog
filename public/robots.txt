@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /mk-admin-panel
+
+Sitemap: https://mustafakeskin.pages.dev/sitemap.xml
