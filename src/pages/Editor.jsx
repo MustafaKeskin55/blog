@@ -503,7 +503,7 @@ export default function Editor({ lang }) {
         code: 'Editör', copyBtn: copied ? 'Kopyalandı!' : 'Kopyala', run: 'Çalıştır',
         preview: 'Önizleme', templates: 'Şablonlar', html: 'HTML', react: 'React', python: 'Python',
         deps: 'Kütüphaneler', depsPh: 'framer-motion, lodash-es',
-        depsHint: 'React + npm paketleri (esm.sh)',
+        depsHint: 'framer-motion, lucide-react veya esm.sh URL import',
       }
     : {
         code: 'Editor', copyBtn: copied ? 'Copied!' : 'Copy', run: 'Run',

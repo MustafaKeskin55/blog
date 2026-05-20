@@ -35,11 +35,56 @@ export function stripImportsForUmd(js) {
 }
 
 function hasEsmImports(js) {
-  return /^\s*import\s+/m.test(js)
+  return /^\s*import\s+/m.test(js) || /https:\/\/esm\.sh\//.test(js)
 }
 
-function buildImportMap(extraDeps) {
+/** esm.sh URL import → 'react' gibi bare specifier + import map URL */
+function parseEsmShSpecifier(spec) {
+  const re = /^(@[^/]+\/[^@]+|[^@/]+)@([\d][\d.]*)(\/.*)?$/
+  const m = spec.match(re)
+  if (m) {
+    const sub = m[3] ? m[3].replace(/^\//, '') : ''
+    const bare = sub ? `${m[1]}/${sub}` : m[1]
+    return { bare, url: `https://esm.sh/${spec}?dev` }
+  }
+  return { bare: spec, url: `https://esm.sh/${spec}?dev` }
+}
+
+/**
+ * Kullanıcı kodunu önizleme için normalize eder.
+ * - https://esm.sh/... import → 'paket-adı'
+ * - root.render() → root.render(<App />)
+ */
+export function normalizeReactUserCode(js) {
+  const urlImports = new Map()
+  let code = js
+
+  code = code.replace(
+    /import\s+([\s\S]*?)\s+from\s+['"]https:\/\/esm\.sh\/([^'"]+)['"]\s*;?/g,
+    (_, imports, spec) => {
+      const { bare, url } = parseEsmShSpecifier(spec)
+      urlImports.set(bare, url)
+      return `import ${imports} from '${bare}';`
+    },
+  )
+
+  code = code.replace(
+    /import\s+ReactDOM\s+from\s+['"]react-dom\/client['"]\s*;?/g,
+    "import * as ReactDOM from 'react-dom/client';",
+  )
+
+  if (/createRoot\s*\(/.test(code) && !/\.render\s*\(\s*</.test(code) && !/\.render\s*\(\s*React\.createElement/.test(code)) {
+    code = code.replace(/\.render\s*\(\s*\)\s*;?/g, '.render(<App />);')
+  }
+
+  return { code: code.trim(), urlImports }
+}
+
+function buildImportMap(extraDeps, urlImports = new Map()) {
   const imports = { ...CORE_IMPORTS }
+  for (const [bare, url] of urlImports) {
+    imports[bare] = url
+  }
   for (const pkg of extraDeps) {
     if (!imports[pkg]) imports[pkg] = `https://esm.sh/${pkg}?dev`
   }
@@ -128,11 +173,11 @@ window.addEventListener('load',function(){
 </html>`
 }
 
-/** ESM + import map — npm paketleri veya import satırı varsa */
-function buildReactEsmPreview(html, css, js, deps) {
+/** ESM + import map — npm paketleri, import veya esm.sh URL */
+function buildReactEsmPreview(html, css, js, deps, urlImports = new Map()) {
   const safeCss = escapeStyle(css)
   const safeJs = escapeScript(js)
-  const importMap = buildImportMap(parseDeps(deps))
+  const importMap = buildImportMap(parseDeps(deps), urlImports)
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -205,11 +250,12 @@ ${ERROR_BOOT}
 export function buildPreviewDocument({ html, css, js, python = '', mode = 'html', deps = '' }) {
   if (mode === 'python') return buildPythonPreview(html, css, python || js)
   if (mode === 'react') {
+    const { code, urlImports } = normalizeReactUserCode(js)
     const extra = parseDeps(deps)
-    if (extra.length > 0 || hasEsmImports(js)) {
-      return buildReactEsmPreview(html, css, js, deps)
+    if (extra.length > 0 || hasEsmImports(code) || urlImports.size > 0) {
+      return buildReactEsmPreview(html, css, code, deps, urlImports)
     }
-    return buildReactUmdPreview(html, css, js)
+    return buildReactUmdPreview(html, css, code)
   }
   return buildHtmlPreview(html, css, js)
 }

@@ -4,6 +4,7 @@ export function detectCodeMode(js, html = '') {
   if (looksLikePython(js) && !/<[A-Z][a-zA-Z]*[\s/>]/.test(js)) return 'python'
   if (
     /from\s+['"]react|import\s+React|ReactDOM\.|createRoot\s*\(|useState\s*\(|useEffect\s*\(/i.test(code) ||
+    /https:\/\/esm\.sh\//i.test(code) ||
     /type\s*=\s*["']text\/babel/i.test(code) ||
     /<[A-Z][a-zA-Z][\w.-]*[\s/>]/.test(js)
   ) {
@@ -23,7 +24,14 @@ export function extractDepsFromJs(js) {
   const deps = new Set()
   for (const m of js.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
     const spec = m[1]
-    const pkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0]
+    let pkg = spec
+    if (spec.includes('esm.sh/')) {
+      const path = spec.replace(/^https:\/\/esm\.sh\//, '')
+      const verMatch = path.match(/^(@[^/]+\/[^@]+|[^@/]+)@/)
+      pkg = verMatch ? verMatch[1] : path.split('/')[0]
+    } else {
+      pkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0]
+    }
     if (pkg && pkg !== 'react' && pkg !== 'react-dom') deps.add(pkg)
   }
   return [...deps].join(', ')
