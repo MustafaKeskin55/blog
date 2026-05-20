@@ -114,10 +114,27 @@
 /* ── PREVIEW ───────────────────────────────────────────── */
 .editor-right { width: 50%; display: flex; flex-direction: column; }
 .preview-bar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
   padding: .6rem 1rem; background: var(--bg3); border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .preview-label { font-family: var(--mono); font-size: .75rem; color: var(--muted); display: flex; align-items: center; gap: .4rem; }
+.preview-controls { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-left: auto; }
+.preview-mode {
+  display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+}
+.preview-mode button {
+  background: none; border: none; color: var(--muted); font-family: var(--mono); font-size: .7rem;
+  padding: .35rem .65rem; cursor: pointer; display: flex; align-items: center; gap: .35rem; transition: all .2s;
+}
+.preview-mode button.active { background: rgba(0,212,255,.12); color: var(--accent); }
+.preview-deps {
+  display: flex; align-items: center; gap: .4rem; font-family: var(--mono); font-size: .68rem; color: var(--muted);
+}
+.preview-deps input {
+  width: min(200px, 38vw); background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: var(--mono); font-size: .68rem; padding: .35rem .5rem; outline: none;
+}
+.preview-deps input:focus { border-color: var(--accent2); }
 .run-btn {
   background: linear-gradient(135deg, var(--accent2), var(--accent));
   border: none; color: var(--bg); font-family: var(--mono);

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { api } from '../lib/api'
+import { buildPreviewDocument } from '../lib/editorPreview'
 import CodeMirror from '@uiw/react-codemirror'
 import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
@@ -291,6 +292,73 @@ h1{font-size:2.5rem;font-weight:900;letter-spacing:-1px}
     },2000)
   })
 })`
+  },
+  reactcounter: {
+    label: 'React Counter', icon: 'fab fa-react', category: 'React', react: true, deps: '',
+    html: `<div id="root"></div>`,
+    css: `*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#080b11;min-height:100vh}
+.app{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2rem;color:#e8edf5}
+h1{font-size:1.6rem;font-weight:800}
+.count{font-size:3.5rem;font-weight:900;font-family:monospace;color:#00d4ff}
+.actions{display:flex;gap:.6rem}
+button{padding:.7rem 1.4rem;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:.9rem;transition:transform .15s,box-shadow .15s}
+button:hover{transform:translateY(-2px)}
+.btn-inc{background:linear-gradient(135deg,#7c3aed,#00d4ff);color:#080b11}
+.btn-dec{background:#111722;color:#e8edf5;border:1px solid #1e2a3a}
+.btn-reset{background:transparent;color:#5a6a8a;border:1px dashed #1e2a3a}`,
+    js: `import { useState } from 'react'
+import { createRoot } from 'react-dom/client'
+
+function App() {
+  const [count, setCount] = useState(0)
+  return (
+    <div className="app">
+      <h1>React Counter</h1>
+      <div className="count">{count}</div>
+      <div className="actions">
+        <button className="btn-dec" onClick={() => setCount(c => c - 1)}>−</button>
+        <button className="btn-reset" onClick={() => setCount(0)}>Reset</button>
+        <button className="btn-inc" onClick={() => setCount(c => c + 1)}>+</button>
+      </div>
+    </div>
+  )
+}
+
+createRoot(document.getElementById('root')).render(<App />)`
+  },
+  reactmotion: {
+    label: 'React + Motion', icon: 'fab fa-react', category: 'React', react: true, deps: 'framer-motion',
+    html: `<div id="root"></div>`,
+    css: `*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#080b11;min-height:100vh}
+.stage{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(0,212,255,.12));border:1px solid rgba(0,212,255,.25);border-radius:20px;padding:2.5rem 3rem;text-align:center;color:#e8edf5}
+.card h2{font-size:1.4rem;margin-bottom:.5rem}
+.card p{color:#5a6a8a;font-size:.9rem}`,
+    js: `import { useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import { motion } from 'framer-motion'
+
+function App() {
+  const [on, setOn] = useState(false)
+  return (
+    <div className="stage">
+      <motion.div
+        className="card"
+        animate={{ scale: on ? 1.08 : 1, rotate: on ? 2 : 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+        onClick={() => setOn(v => !v)}
+        style={{ cursor: 'pointer' }}
+      >
+        <h2>Framer Motion</h2>
+        <p>{on ? 'Animasyon açık — tekrar tıkla' : 'Kartı tıkla'}</p>
+      </motion.div>
+    </div>
+  )
+}
+
+createRoot(document.getElementById('root')).render(<App />)`
   }
 }
 
@@ -312,6 +380,8 @@ export default function Editor({ lang }) {
   const [copied, setCopied] = useState(false)
   const [mobileView, setMobileView] = useState('editor') // 'editor' | 'preview' | 'templates'
   const [tplDrawer, setTplDrawer] = useState(false)
+  const [previewMode, setPreviewMode] = useState('vanilla') // vanilla | react
+  const [npmDeps, setNpmDeps] = useState('')
   const iframeRef = useRef()
 
   useEffect(() => {
@@ -321,15 +391,23 @@ export default function Editor({ lang }) {
   }, [])
 
   const run = () => {
-    const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>${cssCode}</style></head><body>${htmlCode}<script>${jsCode}<\/script></body></html>`
-    iframeRef.current.srcdoc = doc
+    if (!iframeRef.current) return
+    iframeRef.current.srcdoc = buildPreviewDocument({
+      html: htmlCode,
+      css: cssCode,
+      js: jsCode,
+      mode: previewMode,
+      deps: npmDeps,
+    })
   }
-  useEffect(() => { run() }, [htmlCode, cssCode, jsCode])
+  useEffect(() => { run() }, [htmlCode, cssCode, jsCode, previewMode, npmDeps])
 
   const loadTemplate = (key) => {
     const t = templates[key]
     setActiveTemplate(key)
     setHtmlCode(t.html); setCssCode(t.css); setJsCode(t.js)
+    setPreviewMode(t.react ? 'react' : 'vanilla')
+    setNpmDeps(t.deps || '')
     setTplDrawer(false)
     setMobileView('editor')
   }
@@ -340,12 +418,26 @@ export default function Editor({ lang }) {
     setCopied(true); setTimeout(() => setCopied(false), 1500)
   }
 
-  const langMap = { html: html(), css: css(), js: javascript() }
+  const langMap = {
+    html: html(),
+    css: css(),
+    js: javascript(previewMode === 'react' ? { jsx: true, typescript: true } : {}),
+  }
   const categories = [...new Set(Object.values(templates).map(t => t.category))]
 
   const T = lang === 'tr'
-    ? { code: 'Editör', copyBtn: copied ? 'Kopyalandı!' : 'Kopyala', run: 'Çalıştır', preview: 'Önizleme', templates: 'Şablonlar' }
-    : { code: 'Editor', copyBtn: copied ? 'Copied!' : 'Copy', run: 'Run', preview: 'Preview', templates: 'Templates' }
+    ? {
+        code: 'Editör', copyBtn: copied ? 'Kopyalandı!' : 'Kopyala', run: 'Çalıştır',
+        preview: 'Önizleme', templates: 'Şablonlar', vanilla: 'HTML', react: 'React',
+        deps: 'Kütüphaneler', depsPh: 'framer-motion, lodash-es',
+        depsHint: 'esm.sh — virgülle ayır',
+      }
+    : {
+        code: 'Editor', copyBtn: copied ? 'Copied!' : 'Copy', run: 'Run',
+        preview: 'Preview', templates: 'Templates', vanilla: 'HTML', react: 'React',
+        deps: 'Packages', depsPh: 'framer-motion, lodash-es',
+        depsHint: 'esm.sh — comma separated',
+      }
 
   return (
     <div className={`editor-page ${isFullscreen ? 'fullscreen' : ''}`}>
@@ -450,9 +542,27 @@ export default function Editor({ lang }) {
               <i className="fas fa-circle" style={{color:'#ff5f57',fontSize:'.55rem'}}/>
               &nbsp; {T.preview}
             </span>
-            <button className="run-btn" onClick={run}><i className="fas fa-play"/> {T.run}</button>
+            <div className="preview-controls">
+              <div className="preview-mode">
+                <button type="button" className={previewMode === 'vanilla' ? 'active' : ''} onClick={() => setPreviewMode('vanilla')}>{T.vanilla}</button>
+                <button type="button" className={previewMode === 'react' ? 'active' : ''} onClick={() => setPreviewMode('react')}><i className="fab fa-react"/> {T.react}</button>
+              </div>
+              {previewMode === 'react' && (
+                <label className="preview-deps" title={T.depsHint}>
+                  <span>{T.deps}</span>
+                  <input
+                    type="text"
+                    value={npmDeps}
+                    onChange={e => setNpmDeps(e.target.value)}
+                    placeholder={T.depsPh}
+                    spellCheck={false}
+                  />
+                </label>
+              )}
+              <button className="run-btn" onClick={run}><i className="fas fa-play"/> {T.run}</button>
+            </div>
           </div>
-          <iframe ref={iframeRef} className="preview-frame" title="preview" sandbox="allow-scripts"/>
+          <iframe ref={iframeRef} className="preview-frame" title="preview" sandbox="allow-scripts allow-forms allow-modals allow-popups"/>
         </div>
       </div>
     </div>
