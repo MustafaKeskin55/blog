@@ -618,7 +618,7 @@ export default function Admin() {
                   <iframe
                     className="tpl-preview-frame"
                     title="preview"
-                    sandbox="allow-scripts"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
                     srcDoc={buildPreviewDocument({
                       html: previewTpl.html,
                       css: previewTpl.css,

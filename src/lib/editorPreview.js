@@ -1,10 +1,13 @@
 const PKG_RE = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*(\/[a-z0-9][\w.-]*)?$/i
 
+const REACT_CDN = 'https://cdn.jsdelivr.net/npm'
+const BABEL_URL = `${REACT_CDN}/@babel/standalone@7.26.2/babel.min.js`
+
 const CORE_IMPORTS = {
-  react: 'https://esm.sh/react@18.3.1?dev',
-  'react-dom': 'https://esm.sh/react-dom@18.3.1?dev',
-  'react-dom/client': 'https://esm.sh/react-dom@18.3.1/client?dev',
-  'react/jsx-runtime': 'https://esm.sh/react@18.3.1/jsx-runtime?dev',
+  react: `${REACT_CDN}/react@18.3.1/+esm`,
+  'react-dom': `${REACT_CDN}/react-dom@18.3.1/+esm`,
+  'react-dom/client': `${REACT_CDN}/react-dom@18.3.1/client/+esm`,
+  'react/jsx-runtime': `${REACT_CDN}/react@18.3.1/jsx-runtime/+esm`,
 }
 
 export function parseDeps(input) {
@@ -22,6 +25,19 @@ function escapeScript(code) {
   return code.replace(/<\/script/gi, '<\\/script')
 }
 
+/** UMD modunda import satırlarını kaldır (React global olarak gelir) */
+export function stripImportsForUmd(js) {
+  return js
+    .replace(/^import\s+.+?from\s+['"][^'"]+['"];?\s*$/gm, '')
+    .replace(/^import\s+['"][^'"]+['"];?\s*$/gm, '')
+    .replace(/createRoot\s*\(/g, 'ReactDOM.createRoot(')
+    .trim()
+}
+
+function hasEsmImports(js) {
+  return /^\s*import\s+/m.test(js)
+}
+
 function buildImportMap(extraDeps) {
   const imports = { ...CORE_IMPORTS }
   for (const pkg of extraDeps) {
@@ -33,14 +49,36 @@ function buildImportMap(extraDeps) {
 const ERROR_BOOT = `
 <div id="__preview-error" style="display:none;font:12px/1.45 monospace;color:#ffb4b4;background:#1a0808;padding:10px 12px;border-top:1px solid #ff5f57;white-space:pre-wrap;max-height:40vh;overflow:auto;"></div>
 <script>
-window.addEventListener('error',function(e){
+function __showPreviewError(msg){
   var el=document.getElementById('__preview-error');
-  if(el){el.style.display='block';el.textContent=(e.error&&e.error.stack)||e.message;}
+  if(el){el.style.display='block';el.textContent=msg;}
+}
+window.addEventListener('error',function(e){
+  __showPreviewError((e.error&&e.error.stack)||e.message);
 });
 window.addEventListener('unhandledrejection',function(e){
-  var el=document.getElementById('__preview-error');
-  if(el){el.style.display='block';el.textContent=String(e.reason&&(e.reason.stack||e.reason)||e);}
+  __showPreviewError(String(e.reason&&(e.reason.stack||e.reason)||e));
 });
+<\/script>`
+
+const REACT_RUNNER = (userCodeJson) => `
+<script>
+(function(){
+  var USER_CODE = ${userCodeJson};
+  function run(){
+    if(!window.Babel){ __showPreviewError('Babel yüklenemedi. İnternet / CDN engeli olabilir.'); return; }
+    if(!window.React||!window.ReactDOM){ __showPreviewError('React yüklenemedi. CDN (jsdelivr) erişimini kontrol et.'); return; }
+    try {
+      var prelude = 'const {useState,useEffect,useRef,useMemo,useCallback}=React;';
+      var compiled = Babel.transform(prelude + USER_CODE, { presets: ['react'] }).code;
+      new Function('React','ReactDOM', compiled)(React, ReactDOM);
+    } catch(e) {
+      __showPreviewError(e.stack || e.message || String(e));
+    }
+  }
+  if(document.readyState==='complete') run();
+  else window.addEventListener('load', run);
+})();
 <\/script>`
 
 function buildHtmlPreview(html, css, js) {
@@ -61,32 +99,36 @@ ${ERROR_BOOT}
 </html>`
 }
 
-/** UMD React — import gerekmez, sandbox'ta daha güvenilir */
+/** UMD React + Babel.transform (en güvenilir önizleme) */
 function buildReactUmdPreview(html, css, js) {
   const safeCss = escapeStyle(css)
-  const safeJs = escapeScript(js)
+  const code = stripImportsForUmd(js)
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.development.js"><\/script>
-<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"><\/script>
-<script src="https://unpkg.com/@babel/standalone@7.26.2/babel.min.js"><\/script>
+<script crossorigin src="${REACT_CDN}/react@18.3.1/umd/react.development.js"><\/script>
+<script crossorigin src="${REACT_CDN}/react-dom@18.3.1/umd/react-dom.development.js"><\/script>
+<script src="${BABEL_URL}"><\/script>
 <style>${safeCss}</style>
 </head>
 <body>
 ${html}
+<div id="__preview-loading" style="font:12px monospace;color:#5a6a8a;padding:8px;">React yükleniyor…</div>
 ${ERROR_BOOT}
-<script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef, useMemo, useCallback } = React;
-${safeJs}
+${REACT_RUNNER(JSON.stringify(code))}
+<script>
+window.addEventListener('load',function(){
+  var l=document.getElementById('__preview-loading');
+  if(l) setTimeout(function(){ l.style.display='none'; }, 800);
+});
 <\/script>
 </body>
 </html>`
 }
 
-/** ESM + import map — npm kütüphaneleri için */
+/** ESM + import map — npm paketleri veya import satırı varsa */
 function buildReactEsmPreview(html, css, js, deps) {
   const safeCss = escapeStyle(css)
   const safeJs = escapeScript(js)
@@ -97,14 +139,22 @@ function buildReactEsmPreview(html, css, js, deps) {
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <script type="importmap">${importMap}<\/script>
-<script src="https://unpkg.com/@babel/standalone@7.26.2/babel.min.js"><\/script>
+<script src="${BABEL_URL}"><\/script>
 <style>${safeCss}</style>
 </head>
 <body>
 ${html}
 ${ERROR_BOOT}
-<script type="text/babel" data-type="module" data-presets="react">
+<script type="text/babel" data-type="module" data-presets="react" id="__user-react">
 ${safeJs}
+<\/script>
+<script>
+function __runEsmBabel(){
+  if(!window.Babel){ __showPreviewError('Babel yüklenemedi'); return; }
+  try { Babel.transformScriptTags(); } catch(e) { __showPreviewError(e.stack||e.message); }
+}
+if(window.Babel) __runEsmBabel();
+else window.addEventListener('load', __runEsmBabel);
 <\/script>
 </body>
 </html>`
@@ -127,7 +177,7 @@ function buildPythonPreview(html, css, python) {
 ${bodyHtml}
 <div id="py-loading">Python yükleniyor…</div>
 ${ERROR_BOOT}
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"><\/script>
+<script src="https://cdn.jsdelivr.net/pyodide@0.26.4/full/pyodide.js"><\/script>
 <script>
 (async function(){
   var loading=document.getElementById('py-loading');
@@ -141,8 +191,7 @@ ${ERROR_BOOT}
     await pyodide.runPythonAsync(${JSON.stringify(python)});
   }catch(e){
     if(loading)loading.style.display='none';
-    var el=document.getElementById('__preview-error');
-    if(el){el.style.display='block';el.textContent=e.message||String(e);}
+    __showPreviewError(e.message||String(e));
   }
 })();
 <\/script>
@@ -157,9 +206,10 @@ export function buildPreviewDocument({ html, css, js, python = '', mode = 'html'
   if (mode === 'python') return buildPythonPreview(html, css, python || js)
   if (mode === 'react') {
     const extra = parseDeps(deps)
-    return extra.length > 0
-      ? buildReactEsmPreview(html, css, js, deps)
-      : buildReactUmdPreview(html, css, js)
+    if (extra.length > 0 || hasEsmImports(js)) {
+      return buildReactEsmPreview(html, css, js, deps)
+    }
+    return buildReactUmdPreview(html, css, js)
   }
   return buildHtmlPreview(html, css, js)
 }

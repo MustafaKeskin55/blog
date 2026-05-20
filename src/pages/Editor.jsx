@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { api } from '../lib/api'
 import { buildPreviewDocument } from '../lib/editorPreview'
 import CodeMirror from '@uiw/react-codemirror'
@@ -443,7 +443,7 @@ export default function Editor({ lang }) {
       deps: npmDeps,
     })
   }
-  useEffect(() => { run() }, [htmlCode, cssCode, jsCode, pythonCode, editorMode, npmDeps])
+  useLayoutEffect(() => { run() }, [htmlCode, cssCode, jsCode, pythonCode, editorMode, npmDeps])
 
   const loadTemplate = (key) => {
     const t = templates[key]
@@ -643,7 +643,13 @@ export default function Editor({ lang }) {
               <button className="run-btn" onClick={run}><i className="fas fa-play"/> {T.run}</button>
             </div>
           </div>
-          <iframe ref={iframeRef} className="preview-frame" title="preview" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"/>
+          <iframe
+            key={editorMode}
+            ref={iframeRef}
+            className="preview-frame"
+            title="preview"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+          />
         </div>
       </div>
     </div>
