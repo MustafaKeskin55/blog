@@ -78,10 +78,35 @@ export default function Blog({ lang = 'tr' }) {
   useEffect(() => { setPosts(initPosts()) }, [])
   useEffect(() => { setActiveCategory('all') }, [lang])
 
-  // Kategoriler postlardan dinamik üretiliyor
   const dynamicCats = [...new Set(posts.map(p => p.category))].sort()
   const allLabel = lang === 'tr' ? 'Tümü' : 'All'
   const cats = [allLabel, ...dynamicCats]
+
+  // Aktif kategoriye göre SEO dinamik güncelle
+  useEffect(() => {
+    const isAll = activeCategory === 'all'
+    const catName = isAll ? null : activeCategory
+    const title = catName
+      ? (lang === 'en' ? `${catName} Posts | Mustafa Keskin` : `${catName} Yazıları | Mustafa Keskin`)
+      : (lang === 'en' ? 'Blog | Mustafa Keskin — Full Stack Developer' : 'Blog | Mustafa Keskin — Yazılım & Teknoloji')
+    const description = catName
+      ? (lang === 'en'
+          ? `Mustafa Keskin's posts about ${catName}. Hands-on articles with code examples.`
+          : `Mustafa Keskin'in ${catName} üzerine yazdığı yazılar. Kodlu, pratik içerikler.`)
+      : (lang === 'en'
+          ? "Mustafa Keskin's blog about React, Go, JavaScript, CSS and modern web development."
+          : "Mustafa Keskin'in React, Go, JavaScript, CSS ve modern web geliştirme üzerine yazıları.")
+    document.title = title
+    const set = (sel, attr, val) => { const el = document.querySelector(sel); if (el) el.setAttribute(attr, val) }
+    set('meta[name="description"]', 'content', description)
+    set('meta[property="og:title"]', 'content', title)
+    set('meta[property="og:description"]', 'content', description)
+    const url = catName
+      ? `https://mustafakeskin.pages.dev/blog?kategori=${encodeURIComponent(catName)}`
+      : 'https://mustafakeskin.pages.dev/blog'
+    set('meta[property="og:url"]', 'content', url)
+    set('link[rel="canonical"]', 'href', url)
+  }, [activeCategory, lang])
 
   const filtered = posts.filter(p => {
     const allCat = activeCategory === 'all' || activeCategory === 'Tümü' || activeCategory === 'All'

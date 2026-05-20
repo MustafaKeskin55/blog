@@ -78,12 +78,9 @@ function AnalyticsTab() {
 }
 
 const PASS = 'admin123'
-const CATS = ['React', 'Go', 'CSS', 'JavaScript', 'Python', 'PHP', 'Genel']
-const BLANK_POST = { title: '', titleEn: '', category: 'React', excerpt: '', excerptEn: '', content: '', tags: '', readTime: '5 dk' }
-const BLANK_NOTE = { title: '', content: '', category: 'Genel', pinned: false }
-const BLANK_TPL = { label: '', category: 'UI', icon: 'fas fa-square', html: '', css: '', js: '' }
-const NOTE_CATS = ['Genel', 'Fikir', 'Kaynak', 'Yapılacak', 'Kod Notu']
-const TPL_CATS = ['Kart', 'Navigasyon', 'Hero', 'Form', 'Buton', 'Animasyon', 'Dashboard', 'Galeri', 'Diğer']
+const BLANK_POST = { title: '', titleEn: '', category: '', excerpt: '', excerptEn: '', content: '', tags: '', readTime: '5 dk' }
+const BLANK_NOTE = { title: '', content: '', category: '', pinned: false }
+const BLANK_TPL = { label: '', category: '', icon: 'fas fa-square', html: '', css: '', js: '' }
 
 function parseBulkCode(raw) {
   // <style>...</style> → css
@@ -364,9 +361,15 @@ export default function Admin() {
                 </div>
                 <div className="form-group">
                   <label>Kategori</label>
-                  <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                    {CATS.map(c => <option key={c}>{c}</option>)}
-                  </select>
+                  <input
+                    list="post-cats-list"
+                    value={form.category}
+                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                    placeholder="React, Go, CSS... veya yeni yaz"
+                  />
+                  <datalist id="post-cats-list">
+                    {[...new Set(posts.map(p => p.category).filter(Boolean))].map(c => <option key={c} value={c} />)}
+                  </datalist>
                 </div>
                 <div className="form-group" style={{ flex: 0.5, minWidth: 100 }}>
                   <label>Okuma Süresi</label>
@@ -463,9 +466,15 @@ export default function Admin() {
                   </div>
                   <div className="form-group">
                     <label>Kategori</label>
-                    <select value={tplForm.category} onChange={e => setTplForm(f => ({ ...f, category: e.target.value }))}>
-                      {TPL_CATS.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                    <input
+                      list="tpl-cats-list"
+                      value={tplForm.category}
+                      onChange={e => setTplForm(f => ({ ...f, category: e.target.value }))}
+                      placeholder="Kart, Hero, Form... veya yeni yaz"
+                    />
+                    <datalist id="tpl-cats-list">
+                      {[...new Set(templates.map(t => t.category).filter(Boolean))].map(c => <option key={c} value={c} />)}
+                    </datalist>
                   </div>
                 </div>
 
@@ -573,9 +582,15 @@ export default function Admin() {
                   </div>
                   <div className="form-group">
                     <label>Kategori</label>
-                    <select value={noteForm.category} onChange={e => setNoteForm(f => ({ ...f, category: e.target.value }))}>
-                      {NOTE_CATS.map(c => <option key={c}>{c}</option>)}
-                    </select>
+                    <input
+                      list="note-cats-list"
+                      value={noteForm.category}
+                      onChange={e => setNoteForm(f => ({ ...f, category: e.target.value }))}
+                      placeholder="Genel, Fikir, Kaynak... veya yeni yaz"
+                    />
+                    <datalist id="note-cats-list">
+                      {[...new Set(notes.map(n => n.category).filter(Boolean))].map(c => <option key={c} value={c} />)}
+                    </datalist>
                   </div>
                 </div>
                 <div className="form-group">
