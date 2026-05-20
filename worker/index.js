@@ -247,7 +247,7 @@ async function deleteNote(env, id) {
 }
 
 async function getSettings(env) {
-  const { results } = await env.DB.prepare('SELECT key, value FROM settings').all()
+  const { results } = await env.DB.prepare('SELECT "key", value FROM settings').all()
   const map = Object.fromEntries(results.map(r => [r.key, r.value]))
   return { gaMeasurementId: map.ga_measurement_id || '' }
 }
@@ -255,7 +255,7 @@ async function getSettings(env) {
 async function updateSettings(env, data) {
   if (data.gaMeasurementId !== undefined) {
     await env.DB.prepare(`
-      INSERT INTO settings (key, value) VALUES ('ga_measurement_id', ?)
+      INSERT INTO settings ("key", value) VALUES ('ga_measurement_id', ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `).bind(data.gaMeasurementId).run()
   }
