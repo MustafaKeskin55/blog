@@ -205,12 +205,15 @@ else window.addEventListener('load', __runEsmBabel);
 </html>`
 }
 
+const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide@0.26.4/full/pyodide.js'
+
 function buildPythonPreview(html, css, python) {
   const safeCss = escapeStyle(css)
   const bodyHtml = html.trim() || '<pre id="py-out" class="py-out"></pre>'
   const defaultCss = `.py-out{font:13px/1.5 ui-monospace,monospace;color:#e8edf5;background:#0e1117;padding:1rem;margin:0;min-height:100vh;white-space:pre-wrap}
 #py-loading{font:13px monospace;color:#5a6a8a;padding:1rem}`
   const mergedCss = `${defaultCss}\n${safeCss}`
+  const userPython = JSON.stringify(python)
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -220,24 +223,58 @@ function buildPythonPreview(html, css, python) {
 </head>
 <body>
 ${bodyHtml}
-<div id="py-loading">Python yükleniyor…</div>
+<div id="py-loading">Python yükleniyor… (Pyodide ~10MB, ilk açılış yavaş olabilir)</div>
 ${ERROR_BOOT}
-<script src="https://cdn.jsdelivr.net/pyodide@0.26.4/full/pyodide.js"><\/script>
 <script>
-(async function(){
-  var loading=document.getElementById('py-loading');
-  var out=document.getElementById('py-out');
-  if(!out){out=document.createElement('pre');out.id='py-out';out.className='py-out';document.body.appendChild(out);}
-  try{
-    var pyodide=await loadPyodide();
-    if(loading)loading.style.display='none';
-    pyodide.setStdout({batched:function(s){out.textContent+=s+'\\n';}});
-    pyodide.setStderr({batched:function(s){out.textContent+=s+'\\n';}});
-    await pyodide.runPythonAsync(${JSON.stringify(python)});
-  }catch(e){
-    if(loading)loading.style.display='none';
-    __showPreviewError(e.message||String(e));
+(function(){
+  var PY_URL = ${JSON.stringify(PYODIDE_URL)};
+  var USER_CODE = ${userPython};
+
+  function loadPyodideScript(){
+    if (typeof loadPyodide === 'function') return Promise.resolve();
+    return new Promise(function(resolve, reject){
+      var existing = document.querySelector('script[data-pyodide]');
+      if (existing) {
+        existing.addEventListener('load', function(){ resolve(); });
+        existing.addEventListener('error', function(){ reject(new Error('Pyodide script yüklenemedi')); });
+        return;
+      }
+      var s = document.createElement('script');
+      s.src = PY_URL;
+      s.dataset.pyodide = '1';
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error('Pyodide CDN erişilemedi (jsdelivr)')); };
+      document.head.appendChild(s);
+    });
   }
+
+  async function run(){
+    var loading = document.getElementById('py-loading');
+    var out = document.getElementById('py-out');
+    if (!out) {
+      out = document.createElement('pre');
+      out.id = 'py-out';
+      out.className = 'py-out';
+      document.body.appendChild(out);
+    }
+    try {
+      await loadPyodideScript();
+      if (typeof loadPyodide !== 'function') {
+        throw new Error('loadPyodide tanımlı değil — Pyodide henüz hazır değil.');
+      }
+      var pyodide = await loadPyodide();
+      if (loading) loading.style.display = 'none';
+      out.textContent = '';
+      pyodide.setStdout({ batched: function(s){ out.textContent += s + '\\n'; } });
+      pyodide.setStderr({ batched: function(s){ out.textContent += s + '\\n'; } });
+      await pyodide.runPythonAsync(USER_CODE);
+    } catch (e) {
+      if (loading) loading.style.display = 'none';
+      __showPreviewError((e && e.stack) || e.message || String(e));
+    }
+  }
+
+  run();
 })();
 <\/script>
 </body>
