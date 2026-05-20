@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS templates (
   html TEXT DEFAULT '',
   css TEXT DEFAULT '',
   js TEXT DEFAULT '',
+  mode TEXT DEFAULT 'html',
+  py TEXT DEFAULT '',
+  deps TEXT DEFAULT '',
   created_at TEXT DEFAULT (datetime('now'))
 );
 

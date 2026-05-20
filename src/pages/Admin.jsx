@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, setToken, clearToken, isLoggedIn } from '../lib/api'
+import { buildPreviewDocument } from '../lib/editorPreview'
+import { parseBulkCode } from '../lib/parseBulkCode'
 import './Admin.css'
 
 function AnalyticsTab() {
@@ -87,29 +89,15 @@ function AnalyticsTab() {
 
 const BLANK_POST = { title: '', titleEn: '', category: '', excerpt: '', excerptEn: '', content: '', tags: '', readTime: '5 dk' }
 const BLANK_NOTE = { title: '', content: '', category: '', pinned: false }
-const BLANK_TPL = { label: '', category: '', icon: 'fas fa-square', html: '', css: '', js: '' }
+const BLANK_TPL = { label: '', category: '', icon: 'fas fa-square', html: '', css: '', js: '', mode: 'html', py: '', deps: '' }
 
-function parseBulkCode(raw) {
-  // <style>...</style> → css
-  // <script>...</script> (script without src) → js
-  // geri kalan → html
-  let css = '', js = '', html = raw
-
-  const styleMatch = raw.match(/<style[^>]*>([\s\S]*?)<\/style>/i)
-  if (styleMatch) { css = styleMatch[1].trim(); html = html.replace(styleMatch[0], '') }
-
-  const scriptMatch = raw.match(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/i)
-  if (scriptMatch) { js = scriptMatch[1].trim(); html = html.replace(scriptMatch[0], '') }
-
-  // <head> ve <body> taglarını soyundur, sadece body içeriğini al
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
-  if (bodyMatch) html = bodyMatch[1].trim()
-  else html = html.replace(/<\/?(html|head|body|meta|title|link)[^>]*>/gi, '').trim()
-
-  return { html, css, js }
-}
-
-function autoDetectTemplate(html, css, js) {
+function autoDetectTemplate(html, css, js, mode = 'html') {
+  if (mode === 'react') {
+    return { label: guessLabel(html, css, 'React Şablon'), category: 'React' }
+  }
+  if (mode === 'python') {
+    return { label: 'Python Şablon', category: 'Python' }
+  }
   const all = (html + css + js).toLowerCase()
 
   const rules = [
@@ -494,22 +482,23 @@ export default function Admin() {
               <div className="bulk-card">
                 <div className="form-section-label"><i className="fas fa-file-import" /> Toplu Kod Yapıştır</div>
                 <p className="bulk-desc">
-                  Tüm kodu (HTML + <code>&lt;style&gt;</code> + <code>&lt;script&gt;</code>) buraya yapıştır.
-                  Sistem otomatik olarak ayırır — ayrı alanlara geçirmen gerekmez.
+                  HTML, React (JSX / <code>text/babel</code>) veya Python (<code>text/python</code> veya sadece <code>.py</code> kodu) yapıştır.
+                  Sistem <b>HTML / CSS / JS / Python</b> alanlarına ve <b>moda</b> (HTML · React · Python) otomatik ayırır.
                 </p>
                 <textarea
                   className="bulk-textarea"
                   rows={16}
                   value={bulkRaw}
                   onChange={e => setBulkRaw(e.target.value)}
-                  placeholder={`<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    /* CSS buraya */\n  </style>\n</head>\n<body>\n  <!-- HTML buraya -->\n  <script>\n    // JS buraya\n  </script>\n</body>\n</html>`}
+                  placeholder={`<!-- HTML şablonu -->\n<style>/* CSS */</style>\n<div>...</div>\n<script>// JS</script>\n\n<!-- React: type="text/babel" -->\n<!-- Python: <script type="text/python"> veya sadece print("...") -->`}
                 />
                 <div style={{ display: 'flex', gap: '.7rem', marginTop: '.8rem' }}>
                   <button className="btn-sm" onClick={() => {
                     if (!bulkRaw.trim()) return
                     const parsed = parseBulkCode(bulkRaw)
-                    const detected = autoDetectTemplate(parsed.html, parsed.css, parsed.js)
-                    setTplForm({ ...BLANK_TPL, ...parsed, label: detected.label, category: detected.category })
+                    const detected = autoDetectTemplate(parsed.html, parsed.css, parsed.js, parsed.mode)
+                    const icon = parsed.mode === 'react' ? 'fab fa-react' : parsed.mode === 'python' ? 'fab fa-python' : 'fas fa-square'
+                    setTplForm({ ...BLANK_TPL, ...parsed, icon, label: detected.label, category: detected.category })
                     setEditTplId(null)
                     setBulkOpen(false)
                     setBulkRaw('')
@@ -545,7 +534,26 @@ export default function Admin() {
                   </div>
                 </div>
 
-                <div className="form-section-label" style={{ marginTop: '.5rem' }}><i className="fas fa-code" /> Kod Alanları</div>
+                <div className="form-section-label" style={{ marginTop: '.5rem' }}>
+                  <i className="fas fa-code" /> Kod Alanları
+                  <span className={`tpl-mode-badge tpl-mode-badge--${tplForm.mode || 'html'}`}>
+                    {tplForm.mode === 'react' && <><i className="fab fa-react" /> React</>}
+                    {tplForm.mode === 'python' && <><i className="fab fa-python" /> Python</>}
+                    {(!tplForm.mode || tplForm.mode === 'html') && <><i className="fab fa-html5" /> HTML</>}
+                  </span>
+                </div>
+                {tplForm.mode === 'react' && (
+                  <div className="form-group" style={{ marginBottom: '.8rem' }}>
+                    <label>NPM kütüphaneleri <span className="label-hint">(virgülle — editörde otomatik import)</span></label>
+                    <input
+                      value={tplForm.deps || ''}
+                      onChange={e => setTplForm(f => ({ ...f, deps: e.target.value }))}
+                      placeholder="framer-motion, lodash-es"
+                      spellCheck={false}
+                      style={{ fontFamily: 'var(--mono)', fontSize: '.85rem' }}
+                    />
+                  </div>
+                )}
                 <div className="tpl-code-grid">
                   <div className="form-group">
                     <label><i className="fab fa-html5" style={{ color: '#e34c26' }} /> HTML</label>
@@ -565,15 +573,31 @@ export default function Admin() {
                       style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', resize: 'vertical' }}
                     />
                   </div>
-                  <div className="form-group">
-                    <label><i className="fab fa-js" style={{ color: '#f7df1e' }} /> JavaScript</label>
-                    <textarea
-                      rows={14} value={tplForm.js}
-                      onChange={e => setTplForm(f => ({ ...f, js: e.target.value }))}
-                      placeholder="// JavaScript kodu&#10;document.addEventListener('DOMContentLoaded', () => {});"
-                      style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', resize: 'vertical' }}
-                    />
-                  </div>
+                  {tplForm.mode !== 'python' && (
+                    <div className="form-group">
+                      <label>
+                        <i className={tplForm.mode === 'react' ? 'fab fa-react' : 'fab fa-js'} style={{ color: tplForm.mode === 'react' ? '#61dafb' : '#f7df1e' }} />
+                        {tplForm.mode === 'react' ? 'JSX / React' : 'JavaScript'}
+                      </label>
+                      <textarea
+                        rows={14} value={tplForm.js}
+                        onChange={e => setTplForm(f => ({ ...f, js: e.target.value }))}
+                        placeholder={tplForm.mode === 'react' ? "function App() {\n  return <div>Merhaba</div>\n}\nReactDOM.createRoot(...).render(<App />)" : "// JavaScript"}
+                        style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', resize: 'vertical' }}
+                      />
+                    </div>
+                  )}
+                  {tplForm.mode === 'python' && (
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                      <label><i className="fab fa-python" style={{ color: '#ffd43b' }} /> Python</label>
+                      <textarea
+                        rows={14} value={tplForm.py || ''}
+                        onChange={e => setTplForm(f => ({ ...f, py: e.target.value }))}
+                        placeholder={'print("Merhaba")\nfor i in range(3):\n    print(i)'}
+                        style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', resize: 'vertical' }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-submit" style={{ display: 'flex', gap: '.7rem' }}>
@@ -595,7 +619,14 @@ export default function Admin() {
                     className="tpl-preview-frame"
                     title="preview"
                     sandbox="allow-scripts"
-                    srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>${previewTpl.css}</style></head><body>${previewTpl.html}<script>${previewTpl.js}<\/script></body></html>`}
+                    srcDoc={buildPreviewDocument({
+                      html: previewTpl.html,
+                      css: previewTpl.css,
+                      js: previewTpl.js,
+                      python: previewTpl.py,
+                      mode: previewTpl.mode || 'html',
+                      deps: previewTpl.deps,
+                    })}
                   />
                 </div>
               </div>
@@ -613,9 +644,14 @@ export default function Admin() {
                     <div className="tr-cats"><span className="tr-cat">{t.category}</span></div>
                     <h3>{t.label}</h3>
                     <span className="tr-date" style={{ gap: '1rem' }}>
+                      <span className={`tpl-mode-pill tpl-mode-pill--${t.mode || 'html'}`}>
+                        {t.mode === 'react' ? 'React' : t.mode === 'python' ? 'Python' : 'HTML'}
+                      </span>
                       <span><i className="fab fa-html5" /> {t.html ? `${t.html.split('\n').length}L` : '—'}</span>
                       <span><i className="fab fa-css3-alt" /> {t.css ? `${t.css.split('\n').length}L` : '—'}</span>
-                      <span><i className="fab fa-js" /> {t.js ? `${t.js.split('\n').length}L` : '—'}</span>
+                      {t.mode === 'python'
+                        ? <span><i className="fab fa-python" /> {t.py ? `${t.py.split('\n').length}L` : '—'}</span>
+                        : <span><i className="fab fa-js" /> {t.js ? `${t.js.split('\n').length}L` : '—'}</span>}
                     </span>
                   </div>
                   <div className="tr-actions">

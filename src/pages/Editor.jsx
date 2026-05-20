@@ -5,6 +5,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
 import { javascript } from '@codemirror/lang-javascript'
+import { python } from '@codemirror/lang-python'
 import { oneDark } from '@codemirror/theme-one-dark'
 import './Editor.css'
 
@@ -307,10 +308,7 @@ button:hover{transform:translateY(-2px)}
 .btn-inc{background:linear-gradient(135deg,#7c3aed,#00d4ff);color:#080b11}
 .btn-dec{background:#111722;color:#e8edf5;border:1px solid #1e2a3a}
 .btn-reset{background:transparent;color:#5a6a8a;border:1px dashed #1e2a3a}`,
-    js: `import { useState } from 'react'
-import { createRoot } from 'react-dom/client'
-
-function App() {
+    js: `function App() {
   const [count, setCount] = useState(0)
   return (
     <div className="app">
@@ -325,7 +323,7 @@ function App() {
   )
 }
 
-createRoot(document.getElementById('root')).render(<App />)`
+ReactDOM.createRoot(document.getElementById('root')).render(<App />)`
   },
   reactmotion: {
     label: 'React + Motion', icon: 'fab fa-react', category: 'React', react: true, deps: 'framer-motion',
@@ -359,7 +357,19 @@ function App() {
 }
 
 createRoot(document.getElementById('root')).render(<App />)`
-  }
+  },
+  pythonhello: {
+    label: 'Python Hello', icon: 'fab fa-python', category: 'Python', python: true,
+    html: '', css: '',
+    py: `print("Merhaba Python!")
+
+for i in range(3):
+    print("sayı:", i)
+
+toplam = sum([10, 20, 30])
+print("toplam:", toplam)`,
+    js: '',
+  },
 }
 
 function buildTemplates(custom = []) {
@@ -380,8 +390,10 @@ export default function Editor({ lang }) {
   const [copied, setCopied] = useState(false)
   const [mobileView, setMobileView] = useState('editor') // 'editor' | 'preview' | 'templates'
   const [tplDrawer, setTplDrawer] = useState(false)
-  const [previewMode, setPreviewMode] = useState('vanilla') // vanilla | react
+  const [editorMode, setEditorMode] = useState('html') // html | react | python
+  const [pythonCode, setPythonCode] = useState('')
   const [npmDeps, setNpmDeps] = useState('')
+  const modeCache = useRef({})
   const iframeRef = useRef()
 
   useEffect(() => {
@@ -390,53 +402,114 @@ export default function Editor({ lang }) {
       .catch(() => {})
   }, [])
 
+  const snapshotMode = () => {
+    modeCache.current[editorMode] = {
+      html: htmlCode, css: cssCode, js: jsCode, python: pythonCode, npmDeps,
+    }
+  }
+
+  const switchEditorMode = (next) => {
+    if (next === editorMode) return
+    snapshotMode()
+    const saved = modeCache.current[next]
+    if (saved) {
+      setHtmlCode(saved.html)
+      setCssCode(saved.css)
+      setJsCode(saved.js)
+      setPythonCode(saved.python || '')
+      setNpmDeps(saved.npmDeps || '')
+    } else if (next === 'react') {
+      const t = DEFAULT_TEMPLATES.reactcounter
+      setHtmlCode(t.html); setCssCode(t.css); setJsCode(t.js); setPythonCode(''); setNpmDeps(t.deps || '')
+    } else if (next === 'python') {
+      const t = DEFAULT_TEMPLATES.pythonhello
+      setHtmlCode(t.html || ''); setCssCode(t.css || ''); setJsCode(''); setPythonCode(t.py || ''); setNpmDeps('')
+    } else {
+      const t = DEFAULT_TEMPLATES.glassmorphism
+      setHtmlCode(t.html); setCssCode(t.css); setJsCode(t.js); setPythonCode(''); setNpmDeps('')
+    }
+    setEditorMode(next)
+    setActiveTab(next === 'python' ? 'python' : 'html')
+  }
+
   const run = () => {
     if (!iframeRef.current) return
     iframeRef.current.srcdoc = buildPreviewDocument({
       html: htmlCode,
       css: cssCode,
       js: jsCode,
-      mode: previewMode,
+      python: pythonCode,
+      mode: editorMode,
       deps: npmDeps,
     })
   }
-  useEffect(() => { run() }, [htmlCode, cssCode, jsCode, previewMode, npmDeps])
+  useEffect(() => { run() }, [htmlCode, cssCode, jsCode, pythonCode, editorMode, npmDeps])
 
   const loadTemplate = (key) => {
     const t = templates[key]
+    snapshotMode()
+    const mode = t.mode || (t.python ? 'python' : t.react ? 'react' : 'html')
+    const snap = {
+      html: t.html || '', css: t.css || '', js: t.js || '',
+      python: t.py || '', npmDeps: t.deps || '',
+    }
+    modeCache.current[mode] = snap
     setActiveTemplate(key)
-    setHtmlCode(t.html); setCssCode(t.css); setJsCode(t.js)
-    setPreviewMode(t.react ? 'react' : 'vanilla')
-    setNpmDeps(t.deps || '')
+    setEditorMode(mode)
+    setHtmlCode(snap.html); setCssCode(snap.css); setJsCode(snap.js)
+    setPythonCode(snap.python); setNpmDeps(snap.npmDeps)
+    setActiveTab(mode === 'python' ? 'python' : 'html')
     setTplDrawer(false)
     setMobileView('editor')
   }
 
   const copy = () => {
-    const map = { html: htmlCode, css: cssCode, js: jsCode }
-    navigator.clipboard.writeText(map[activeTab])
+    const map = { html: htmlCode, css: cssCode, js: jsCode, python: pythonCode }
+    navigator.clipboard.writeText(map[activeTab] ?? '')
     setCopied(true); setTimeout(() => setCopied(false), 1500)
+  }
+
+  const codeTabs = editorMode === 'python'
+    ? [{ id: 'python', label: 'PYTHON', icon: 'fab fa-python' }]
+    : editorMode === 'react'
+      ? [
+          { id: 'html', label: 'HTML', icon: 'fab fa-html5' },
+          { id: 'css', label: 'CSS', icon: 'fab fa-css3-alt' },
+          { id: 'js', label: 'JSX', icon: 'fab fa-react' },
+        ]
+      : [
+          { id: 'html', label: 'HTML', icon: 'fab fa-html5' },
+          { id: 'css', label: 'CSS', icon: 'fab fa-css3-alt' },
+          { id: 'js', label: 'JS', icon: 'fab fa-js' },
+        ]
+
+  const lineCount = (tab) => {
+    if (tab === 'html') return htmlCode.split('\n').length
+    if (tab === 'css') return cssCode.split('\n').length
+    if (tab === 'python') return pythonCode.split('\n').length
+    return jsCode.split('\n').length
   }
 
   const langMap = {
     html: html(),
     css: css(),
-    js: javascript(previewMode === 'react' ? { jsx: true, typescript: true } : {}),
+    js: javascript(editorMode === 'react' ? { jsx: true, typescript: true } : {}),
+    python: python(),
   }
   const categories = [...new Set(Object.values(templates).map(t => t.category))]
 
   const T = lang === 'tr'
     ? {
         code: 'Editör', copyBtn: copied ? 'Kopyalandı!' : 'Kopyala', run: 'Çalıştır',
-        preview: 'Önizleme', templates: 'Şablonlar', vanilla: 'HTML', react: 'React',
+        preview: 'Önizleme', templates: 'Şablonlar', html: 'HTML', react: 'React', python: 'Python',
         deps: 'Kütüphaneler', depsPh: 'framer-motion, lodash-es',
-        depsHint: 'esm.sh — virgülle ayır',
+        depsHint: 'React + npm paketleri (esm.sh)',
       }
     : {
         code: 'Editor', copyBtn: copied ? 'Copied!' : 'Copy', run: 'Run',
-        preview: 'Preview', templates: 'Templates', vanilla: 'HTML', react: 'React',
+        preview: 'Preview', templates: 'Templates', html: 'HTML', react: 'React', python: 'Python',
         deps: 'Packages', depsPh: 'framer-motion, lodash-es',
-        depsHint: 'esm.sh — comma separated',
+        depsHint: 'React + npm packages (esm.sh)',
       }
 
   return (
@@ -444,9 +517,15 @@ export default function Editor({ lang }) {
 
       {/* DESKTOP TOP BAR */}
       <div className="editor-topbar">
-        <div className="editor-tabs-main">
-          <button className="main-tab active">
-            <i className="fas fa-code"/> {T.code}
+        <div className="editor-tabs-main editor-mode-tabs">
+          <button type="button" className={`main-tab ${editorMode === 'html' ? 'active' : ''}`} onClick={() => switchEditorMode('html')}>
+            <i className="fab fa-html5"/> {T.html}
+          </button>
+          <button type="button" className={`main-tab ${editorMode === 'react' ? 'active' : ''}`} onClick={() => switchEditorMode('react')}>
+            <i className="fab fa-react"/> {T.react}
+          </button>
+          <button type="button" className={`main-tab ${editorMode === 'python' ? 'active' : ''}`} onClick={() => switchEditorMode('python')}>
+            <i className="fab fa-python"/> {T.python}
           </button>
         </div>
         <div className="editor-actions">
@@ -517,11 +596,11 @@ export default function Editor({ lang }) {
           {/* Code panel */}
           <div className="editor-panel">
             <div className="tab-bar">
-              {['html', 'css', 'js'].map(tab => (
-                <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-                  <i className={tab === 'html' ? 'fab fa-html5' : tab === 'css' ? 'fab fa-css3-alt' : 'fab fa-js'}/>
-                  {tab.toUpperCase()}
-                  <span className="line-count">{(tab === 'html' ? htmlCode : tab === 'css' ? cssCode : jsCode).split('\n').length}L</span>
+              {codeTabs.map(tab => (
+                <button key={tab.id} className={`tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
+                  <i className={tab.icon}/>
+                  {tab.label}
+                  <span className="line-count">{lineCount(tab.id)}L</span>
                 </button>
               ))}
             </div>
@@ -529,6 +608,7 @@ export default function Editor({ lang }) {
               {activeTab === 'html' && <CodeMirror value={htmlCode} onChange={setHtmlCode} extensions={[langMap.html]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true, foldGutter: true }}/>}
               {activeTab === 'css' && <CodeMirror value={cssCode} onChange={setCssCode} extensions={[langMap.css]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true }}/>}
               {activeTab === 'js' && <CodeMirror value={jsCode} onChange={setJsCode} extensions={[langMap.js]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true }}/>}
+              {activeTab === 'python' && <CodeMirror value={pythonCode} onChange={setPythonCode} extensions={[langMap.python]} theme={oneDark} height="100%" basicSetup={{ lineNumbers: true }}/>}
             </div>
           </div>
         </div>
@@ -543,11 +623,12 @@ export default function Editor({ lang }) {
               &nbsp; {T.preview}
             </span>
             <div className="preview-controls">
-              <div className="preview-mode">
-                <button type="button" className={previewMode === 'vanilla' ? 'active' : ''} onClick={() => setPreviewMode('vanilla')}>{T.vanilla}</button>
-                <button type="button" className={previewMode === 'react' ? 'active' : ''} onClick={() => setPreviewMode('react')}><i className="fab fa-react"/> {T.react}</button>
-              </div>
-              {previewMode === 'react' && (
+              <span className="preview-mode-badge">
+                {editorMode === 'html' && <><i className="fab fa-html5"/> HTML</>}
+                {editorMode === 'react' && <><i className="fab fa-react"/> React</>}
+                {editorMode === 'python' && <><i className="fab fa-python"/> Python</>}
+              </span>
+              {editorMode === 'react' && (
                 <label className="preview-deps" title={T.depsHint}>
                   <span>{T.deps}</span>
                   <input
@@ -562,7 +643,7 @@ export default function Editor({ lang }) {
               <button className="run-btn" onClick={run}><i className="fas fa-play"/> {T.run}</button>
             </div>
           </div>
-          <iframe ref={iframeRef} className="preview-frame" title="preview" sandbox="allow-scripts allow-forms allow-modals allow-popups"/>
+          <iframe ref={iframeRef} className="preview-frame" title="preview" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"/>
         </div>
       </div>
     </div>

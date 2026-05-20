@@ -52,6 +52,12 @@
   border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 1rem;
 }
 .editor-tabs-main { display: flex; gap: .3rem; }
+.editor-mode-tabs { flex-wrap: wrap; }
+.preview-mode-badge {
+  font-family: var(--mono); font-size: .7rem; color: var(--accent);
+  display: flex; align-items: center; gap: .35rem; padding: .3rem .55rem;
+  background: rgba(0,212,255,.08); border: 1px solid rgba(0,212,255,.2); border-radius: 6px;
+}
 .main-tab {
   background: transparent; border: 1px solid transparent;
   color: var(--muted); font-family: var(--mono); font-size: .78rem;

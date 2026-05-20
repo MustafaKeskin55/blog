@@ -64,6 +64,7 @@ function rowToPost(row) {
 }
 
 function rowToTemplate(row) {
+  const mode = row.mode || 'html'
   return {
     id: row.id,
     label: row.label,
@@ -72,6 +73,11 @@ function rowToTemplate(row) {
     html: row.html || '',
     css: row.css || '',
     js: row.js || '',
+    mode,
+    py: row.py || '',
+    deps: row.deps || '',
+    react: mode === 'react',
+    python: mode === 'python',
   }
 }
 
@@ -102,6 +108,7 @@ function postToDb(post) {
 }
 
 function templateToDb(tpl) {
+  const mode = tpl.mode || (tpl.python ? 'python' : tpl.react ? 'react' : 'html')
   return {
     id: String(tpl.id),
     label: tpl.label,
@@ -110,6 +117,9 @@ function templateToDb(tpl) {
     html: tpl.html || '',
     css: tpl.css || '',
     js: tpl.js || '',
+    mode,
+    py: tpl.py || '',
+    deps: tpl.deps || '',
   }
 }
 
@@ -198,9 +208,9 @@ async function getTemplates(env) {
 async function insertTemplate(env, tpl) {
   const t = templateToDb(tpl)
   await env.DB.prepare(`
-    INSERT INTO templates (id, label, category, icon, html, css, js)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).bind(t.id, t.label, t.category, t.icon, t.html, t.css, t.js).run()
+    INSERT INTO templates (id, label, category, icon, html, css, js, mode, py, deps)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(t.id, t.label, t.category, t.icon, t.html, t.css, t.js, t.mode, t.py, t.deps).run()
   const row = await env.DB.prepare('SELECT * FROM templates WHERE id = ?').bind(t.id).first()
   return rowToTemplate(row)
 }
@@ -208,8 +218,8 @@ async function insertTemplate(env, tpl) {
 async function updateTemplate(env, id, tpl) {
   const t = templateToDb({ ...tpl, id })
   await env.DB.prepare(`
-    UPDATE templates SET label=?, category=?, icon=?, html=?, css=?, js=? WHERE id=?
-  `).bind(t.label, t.category, t.icon, t.html, t.css, t.js, id).run()
+    UPDATE templates SET label=?, category=?, icon=?, html=?, css=?, js=?, mode=?, py=?, deps=? WHERE id=?
+  `).bind(t.label, t.category, t.icon, t.html, t.css, t.js, t.mode, t.py, t.deps, id).run()
   const row = await env.DB.prepare('SELECT * FROM templates WHERE id = ?').bind(id).first()
   return rowToTemplate(row)
 }
