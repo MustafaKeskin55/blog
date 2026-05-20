@@ -67,7 +67,12 @@ export default function Blog({ lang = 'tr' }) {
   const [search, setSearch] = useState('')
   const t = T[lang]
 
-  useEffect(() => { setPosts(initPosts()) }, [])
+  useEffect(() => {
+    fetch('/api/posts')
+      .then(r => r.json())
+      .then(setPosts)
+      .catch(() => setPosts([]))
+  }, [])
   useEffect(() => { setActiveCategory('all') }, [lang])
 
   const dynamicCats = [...new Set(posts.map(p => p.category))].sort()
