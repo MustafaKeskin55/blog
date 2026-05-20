@@ -314,6 +314,8 @@ export default function Editor({ lang }) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [splitV, setSplitV] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [mobileView, setMobileView] = useState('editor') // 'editor' | 'preview' | 'templates'
+  const [tplDrawer, setTplDrawer] = useState(false)
   const iframeRef = useRef()
 
   const run = () => {
@@ -326,6 +328,8 @@ export default function Editor({ lang }) {
     const t = templates[key]
     setActiveTemplate(key)
     setHtmlCode(t.html); setCssCode(t.css); setJsCode(t.js)
+    setTplDrawer(false)
+    setMobileView('editor')
   }
 
   const copy = () => {
@@ -338,12 +342,13 @@ export default function Editor({ lang }) {
   const categories = [...new Set(Object.values(templates).map(t => t.category))]
 
   const T = lang === 'tr'
-    ? { code: 'Kod Editörü', copyBtn: copied ? 'Kopyalandı!' : 'Kopyala', run: 'Çalıştır', preview: 'Önizleme' }
-    : { code: 'Code Editor', copyBtn: copied ? 'Copied!' : 'Copy', run: 'Run', preview: 'Preview' }
+    ? { code: 'Editör', copyBtn: copied ? 'Kopyalandı!' : 'Kopyala', run: 'Çalıştır', preview: 'Önizleme', templates: 'Şablonlar' }
+    : { code: 'Editor', copyBtn: copied ? 'Copied!' : 'Copy', run: 'Run', preview: 'Preview', templates: 'Templates' }
 
   return (
     <div className={`editor-page ${isFullscreen ? 'fullscreen' : ''}`}>
-      {/* TOP BAR */}
+
+      {/* DESKTOP TOP BAR */}
       <div className="editor-topbar">
         <div className="editor-tabs-main">
           <button className="main-tab active">
@@ -352,15 +357,55 @@ export default function Editor({ lang }) {
         </div>
         <div className="editor-actions">
           <button className="action-btn" onClick={copy} title={T.copyBtn}><i className={`fas fa-${copied ? 'check' : 'copy'}`}/></button>
-          <button className="action-btn" onClick={() => setSplitV(v => !v)} title="Layout"><i className="fas fa-columns"/></button>
+          <button className="action-btn desktop-only" onClick={() => setSplitV(v => !v)} title="Layout"><i className="fas fa-columns"/></button>
           <button className="action-btn" onClick={() => setIsFullscreen(f => !f)} title="Fullscreen"><i className={`fas fa-${isFullscreen ? 'compress' : 'expand'}`}/></button>
         </div>
       </div>
 
-      {/* CODE MODE */}
+      {/* MOBILE BOTTOM NAV */}
+      <div className="editor-mobile-nav">
+        <button className={mobileView === 'editor' ? 'active' : ''} onClick={() => setMobileView('editor')}>
+          <i className="fas fa-code"/><span>Kod</span>
+        </button>
+        <button className={mobileView === 'preview' ? 'active' : ''} onClick={() => setMobileView('preview')}>
+          <i className="fas fa-play"/><span>Önizle</span>
+        </button>
+        <button className={tplDrawer ? 'active' : ''} onClick={() => setTplDrawer(d => !d)}>
+          <i className="fas fa-layer-group"/><span>Şablonlar</span>
+        </button>
+        <button onClick={copy}>
+          <i className={`fas fa-${copied ? 'check' : 'copy'}`}/><span>{copied ? 'Kopyalandı' : 'Kopyala'}</span>
+        </button>
+      </div>
+
+      {/* TEMPLATE DRAWER (mobile) */}
+      {tplDrawer && (
+        <div className="tpl-drawer-overlay" onClick={() => setTplDrawer(false)}>
+          <div className="tpl-drawer" onClick={e => e.stopPropagation()}>
+            <div className="tpl-drawer-header">
+              <span><i className="fas fa-layer-group"/> {T.templates}</span>
+              <button onClick={() => setTplDrawer(false)}><i className="fas fa-times"/></button>
+            </div>
+            <div className="tpl-drawer-body">
+              {categories.map(cat => (
+                <div key={cat}>
+                  <div className="tpl-cat-label">{cat}</div>
+                  {Object.entries(templates).filter(([,t]) => t.category === cat).map(([key, t]) => (
+                    <button key={key} className={`tpl-item ${activeTemplate === key ? 'active' : ''}`} onClick={() => loadTemplate(key)}>
+                      <i className={t.icon}/> {t.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDITOR BODY */}
       <div className="editor-body">
-        <div className={`editor-left ${splitV ? 'split-v' : ''}`}>
-          {/* Template picker */}
+        <div className={`editor-left ${splitV ? 'split-v' : ''} ${mobileView === 'editor' ? 'mobile-active' : 'mobile-hidden'}`}>
+          {/* Template sidebar (desktop only) */}
           <div className="template-sidebar">
             <div className="tpl-section-label">Templates</div>
             {categories.map(cat => (
@@ -395,9 +440,14 @@ export default function Editor({ lang }) {
         </div>
 
         {/* RIGHT: preview */}
-        <div className="editor-right">
+        <div className={`editor-right ${mobileView === 'preview' ? 'mobile-active' : mobileView === 'editor' ? 'mobile-hidden' : 'mobile-hidden'}`}>
           <div className="preview-bar">
-            <span className="preview-label"><i className="fas fa-circle" style={{color:'#28c840',fontSize:'.55rem'}}/> <i className="fas fa-circle" style={{color:'#febc2e',fontSize:'.55rem'}}/> <i className="fas fa-circle" style={{color:'#ff5f57',fontSize:'.55rem'}}/> &nbsp; {T.preview}</span>
+            <span className="preview-label">
+              <i className="fas fa-circle" style={{color:'#28c840',fontSize:'.55rem'}}/>
+              <i className="fas fa-circle" style={{color:'#febc2e',fontSize:'.55rem'}}/>
+              <i className="fas fa-circle" style={{color:'#ff5f57',fontSize:'.55rem'}}/>
+              &nbsp; {T.preview}
+            </span>
             <button className="run-btn" onClick={run}><i className="fas fa-play"/> {T.run}</button>
           </div>
           <iframe ref={iframeRef} className="preview-frame" title="preview" sandbox="allow-scripts"/>

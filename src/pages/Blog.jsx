@@ -67,14 +67,6 @@ export default function Blog({ lang = 'tr' }) {
   const [search, setSearch] = useState('')
   const t = T[lang]
 
-  useSEO({
-    title: lang === 'en' ? 'Blog | Mustafa Keskin — Full Stack Developer' : 'Blog | Mustafa Keskin — Yazılım & Teknoloji',
-    description: lang === 'en'
-      ? 'Mustafa Keskin\'s blog about React, Go, JavaScript, CSS and modern web development.'
-      : 'Mustafa Keskin\'in React, Go, JavaScript, CSS ve modern web geliştirme üzerine yazıları.',
-    url: 'https://mustafakeskin.pages.dev/blog'
-  })
-
   useEffect(() => { setPosts(initPosts()) }, [])
   useEffect(() => { setActiveCategory('all') }, [lang])
 
