@@ -205,7 +205,11 @@ else window.addEventListener('load', __runEsmBabel);
 </html>`
 }
 
-const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide@0.26.4/full/pyodide.js'
+const PYODIDE_SOURCES = [
+  { script: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js', indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/' },
+  { script: 'https://unpkg.com/pyodide@0.26.4/full/pyodide.js', indexURL: 'https://unpkg.com/pyodide@0.26.4/full/' },
+  { script: 'https://cdn.jsdelivr.net/npm/pyodide@0.26.4/full/pyodide.js', indexURL: 'https://cdn.jsdelivr.net/npm/pyodide@0.26.4/full/' },
+]
 
 function buildPythonPreview(html, css, python) {
   const safeCss = escapeStyle(css)
@@ -214,6 +218,7 @@ function buildPythonPreview(html, css, python) {
 #py-loading{font:13px monospace;color:#5a6a8a;padding:1rem}`
   const mergedCss = `${defaultCss}\n${safeCss}`
   const userPython = JSON.stringify(python)
+  const pySourcesJson = JSON.stringify(PYODIDE_SOURCES)
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -223,29 +228,60 @@ function buildPythonPreview(html, css, python) {
 </head>
 <body>
 ${bodyHtml}
-<div id="py-loading">Python yükleniyor… (Pyodide ~10MB, ilk açılış yavaş olabilir)</div>
+<div id="py-loading">Python yükleniyor… (Pyodide ~10MB, ilk açılış 15–40 sn sürebilir)</div>
 ${ERROR_BOOT}
 <script>
 (function(){
-  var PY_URL = ${JSON.stringify(PYODIDE_URL)};
+  var PY_SOURCES = ${pySourcesJson};
   var USER_CODE = ${userPython};
+  var __pyIndexURL = null;
 
-  function loadPyodideScript(){
-    if (typeof loadPyodide === 'function') return Promise.resolve();
+  function loadOneScript(url, timeoutMs){
     return new Promise(function(resolve, reject){
-      var existing = document.querySelector('script[data-pyodide]');
-      if (existing) {
-        existing.addEventListener('load', function(){ resolve(); });
-        existing.addEventListener('error', function(){ reject(new Error('Pyodide script yüklenemedi')); });
-        return;
-      }
+      var done = false;
+      var t = setTimeout(function(){
+        if (done) return;
+        done = true;
+        reject(new Error('Zaman aşımı: ' + url));
+      }, timeoutMs || 90000);
       var s = document.createElement('script');
-      s.src = PY_URL;
-      s.dataset.pyodide = '1';
-      s.onload = function(){ resolve(); };
-      s.onerror = function(){ reject(new Error('Pyodide CDN erişilemedi (jsdelivr)')); };
+      s.src = url;
+      s.async = true;
+      s.onload = function(){
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        resolve();
+      };
+      s.onerror = function(){
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        reject(new Error('Yüklenemedi: ' + url));
+      };
       document.head.appendChild(s);
     });
+  }
+
+  async function loadPyodideScript(){
+    if (typeof loadPyodide === 'function' && __pyIndexURL) return __pyIndexURL;
+    var errors = [];
+    for (var i = 0; i < PY_SOURCES.length; i++) {
+      var src = PY_SOURCES[i];
+      try {
+        if (typeof loadPyodide !== 'function') {
+          document.querySelectorAll('script[data-pyodide]').forEach(function(n){ n.remove(); });
+          await loadOneScript(src.script, 90000);
+        }
+        if (typeof loadPyodide !== 'function') throw new Error('loadPyodide yok');
+        __pyIndexURL = src.indexURL;
+        return __pyIndexURL;
+      } catch (e) {
+        errors.push(e.message || String(e));
+      }
+    }
+    throw new Error('Pyodide hiçbir CDN\\'den yüklenemedi.\\n' + errors.join('\\n') +
+      '\\n\\nİpucu: VPN/reklam engelleyici kapat, farklı ağ dene veya sadece print() içeren kısa kod dene.');
   }
 
   async function run(){
@@ -258,11 +294,8 @@ ${ERROR_BOOT}
       document.body.appendChild(out);
     }
     try {
-      await loadPyodideScript();
-      if (typeof loadPyodide !== 'function') {
-        throw new Error('loadPyodide tanımlı değil — Pyodide henüz hazır değil.');
-      }
-      var pyodide = await loadPyodide();
+      var indexURL = await loadPyodideScript();
+      var pyodide = await loadPyodide({ indexURL: indexURL });
       if (loading) loading.style.display = 'none';
       out.textContent = '';
       pyodide.setStdout({ batched: function(s){ out.textContent += s + '\\n'; } });
