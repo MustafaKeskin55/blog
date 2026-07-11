@@ -13,4 +13,4 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "blog"
-database_id = "4484b690-c3a7-4d1f-8740-f50509293efc"
+database_id = "66c0b65d-d988-44ef-8500-7ec4918a2f4e"
